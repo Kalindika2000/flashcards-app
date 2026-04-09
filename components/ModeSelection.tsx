@@ -9,10 +9,7 @@ export default function ModeSelection({
 }) {
   return (
     <div className="flex flex-col items-center justify-center h-full px-4 text-center">
-      <h1 className="text-2xl font-bold mb-6">
-        Choose how you want to study
-      </h1>
-
+      
       <div className="w-full max-w-md space-y-4">
         <button
           onClick={onSelectFlashcards}

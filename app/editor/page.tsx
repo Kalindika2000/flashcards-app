@@ -46,6 +46,9 @@ const [challenges, setChallenges] = useState<Challenge[]>([]);
   const [isDirty, setIsDirty] = useState(false);
   const [showLeaveModal, setShowLeaveModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [originalNotes, setOriginalNotes] = useState("");
+  const [showUpdateModal, setShowUpdateModal] = useState(false);
+  
   useEffect(() => {
   if (!noteId) return;
 
@@ -59,6 +62,7 @@ const [challenges, setChallenges] = useState<Challenge[]>([]);
 
       setTitle(data.title || "");
       setNotes(data.content || "");
+      setOriginalNotes(data.content || "");
     }
   };
 
@@ -145,7 +149,7 @@ if (!plainText) {
   return;
 }
 
-  let currentNoteId = noteId;
+  /*let currentNoteId = noteId;
 
   if (!currentNoteId) {
     currentNoteId = await saveNote();
@@ -157,7 +161,37 @@ if (!plainText) {
   }
 
   setIsDirty(false);
+  router.push(`/deck/${deckId}`);*/
+  let currentNoteId = noteId;
+
+// 🆕 CREATE MODE
+if (!currentNoteId) {
+  currentNoteId = await saveNote();
+  setIsDirty(false);
   router.push(`/deck/${deckId}`);
+  return;
+}
+
+// ✏️ EDIT MODE
+
+// compare plain text
+const originalPlain = originalNotes.replace(/<[^>]*>/g, "").trim();
+const currentPlain = notes.replace(/<[^>]*>/g, "").trim();
+
+// if content unchanged → normal save
+if (originalPlain === currentPlain) {
+  await updateDoc(doc(db, "notes", currentNoteId), {
+    title: title,
+    content: notes,
+  });
+
+  setIsDirty(false);
+  router.push(`/deck/${deckId}`);
+  return;
+}
+
+// 🔴 content changed → show modal
+setShowUpdateModal(true);
 };
 
 
@@ -227,6 +261,33 @@ const deleteFlashcardsForNote = async (noteId: string) => {
   }
 
   return { totalDeleted, knownDeleted };
+};
+
+const handleSaveOnly = async () => {
+  if (!noteId) return;
+
+  await updateDoc(doc(db, "notes", noteId), {
+    title: title,
+    content: notes,
+  });
+
+  setOriginalNotes(notes);
+  setShowUpdateModal(false);
+  setIsDirty(false);
+};
+
+const handleGoToStudy = async () => {
+  if (!noteId) return;
+
+  await updateDoc(doc(db, "notes", noteId), {
+    title: title,
+    content: notes,
+  });
+
+  setShowUpdateModal(false);
+  setIsDirty(false);
+
+  router.push(`/study?deckId=${deckId}&noteId=${noteId}`);
 };
   const generateFlashcards = async () => {
     let currentNoteId = noteId;
@@ -1083,6 +1144,84 @@ if (prevKnown !== newKnown) {
       >
         OK
       </button>
+    </div>
+  </div>
+)}
+
+{showUpdateModal && (
+  <div
+    style={{
+      position: "fixed",
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      background: "rgba(0,0,0,0.5)",
+      display: "flex",
+      justifyContent: "center",
+      alignItems: "center",
+      zIndex: 99999,
+    }}
+  >
+    <div
+      style={{
+        background: "white",
+        padding: "20px",
+        borderRadius: "12px",
+        width: "320px",
+        textAlign: "center",
+      }}
+    >
+      <h3 style={{ marginBottom: "10px" }}>
+        Flashcards may be outdated
+      </h3>
+
+      <p style={{ marginBottom: "20px", fontSize: "14px" }}>
+        You’ve changed your notes. Your flashcards may no longer match.
+      </p>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+        <button
+          onClick={handleSaveOnly}
+          style={{
+            padding: "10px",
+            borderRadius: "8px",
+            border: "none",
+            background: "#16a34a",
+            color: "white",
+            cursor: "pointer",
+          }}
+        >
+          Save Only
+        </button>
+
+        <button
+          onClick={handleGoToStudy}
+          style={{
+            padding: "10px",
+            borderRadius: "8px",
+            border: "none",
+            background: "#2563eb",
+            color: "white",
+            cursor: "pointer",
+          }}
+        >
+          Save & Go to Study
+        </button>
+
+        <button
+          onClick={() => setShowUpdateModal(false)}
+          style={{
+            padding: "10px",
+            borderRadius: "8px",
+            border: "1px solid #ccc",
+            background: "white",
+            cursor: "pointer",
+          }}
+        >
+          Cancel
+        </button>
+      </div>
     </div>
   </div>
 )}

@@ -11,6 +11,15 @@ import { db } from "@/lib/firebase";
 import { generateChallengeClips } from "@/lib/challengeGeneratorUtil";
 import BottomNav from "@/components/BottomNav";
 import type { Challenge } from "@/lib/challengeGeneratorUtil";
+/*import {
+  collection,
+  getDocs,
+  doc,
+  updateDoc,
+  query,
+  where,
+} from "firebase/firestore";*/
+
 import {
   collection,
   getDocs,
@@ -18,6 +27,7 @@ import {
   updateDoc,
   query,
   where,
+  addDoc,
 } from "firebase/firestore";
 
 type FlashcardType = {
@@ -34,7 +44,7 @@ type FlashcardType = {
   const searchParams = useSearchParams();
   const router = useRouter();
   const noteId = searchParams.get("noteId");
-
+const [sessionCards, setSessionCards] = useState<number[]>([]);
   const [flashcards, setFlashcards] = useState<FlashcardType[]>([]);
   const [challenges, setChallenges] = useState<Challenge[]>([]);
 const [challengeIndex, setChallengeIndex] = useState(0);
@@ -50,10 +60,14 @@ const [showChallengeAnswer, setShowChallengeAnswer] = useState(false);
   const [bestStreak, setBestStreak] = useState(0);
   const [isSessionComplete, setIsSessionComplete] = useState(false);
 const [restartMode, setRestartMode] = useState<"all" | "difficult">("all");
-const someKnown = knownCards.length > 0;
-const allMastered = knownCards.length === flashcards.length;
 
-const activeCards = flashcards.map((_, i) => i);
+
+const activeCards =
+  sessionCards.length > 0
+    ? sessionCards
+    : flashcards.map((_, i) => i);
+    const someKnown = knownCards.length > 0;
+const allMastered = knownCards.length === activeCards.length;
 const actualIndex = activeCards[currentIndex] ?? currentIndex;
 
   // ✅ LOAD ONLY CARDS FOR THIS NOTE
@@ -75,6 +89,8 @@ const actualIndex = activeCards[currentIndex] ?? currentIndex;
     setFlashcards(cards);
   };
 const handleGenerateChallenges = async () => {
+  
+  
   if (!note?.content) return;
 
   console.log("Generating challenge clips...");
@@ -86,6 +102,49 @@ const handleGenerateChallenges = async () => {
   setChallenges(result);
   setChallengeIndex(0);
   setShowChallengeAnswer(false);
+};
+
+const handleGenerateFlashcards = async () => {
+  if (!note?.content || !noteId) return;
+
+  const plainText = note.content.replace(/<[^>]*>/g, "").trim();
+  if (!plainText) return;
+
+  try {
+    const res = await fetch("/api/generate", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ notes: note.content }),
+    });
+
+    if (!res.ok) throw new Error("API failed");
+
+    const data = await res.json();
+
+    if (!data.flashcards || data.flashcards.length === 0) {
+      alert("No flashcards returned");
+      return;
+    }
+
+    for (const card of data.flashcards) {
+      await addDoc(collection(db, "flashcards"), {
+        question: card.question,
+        answer: card.answer,
+        noteId: noteId,
+        createdAt: new Date(),
+        known: false,
+      });
+    }
+
+    await loadFlashcards();
+    setMode("flashcards");
+
+  } catch (err) {
+    console.error(err);
+    alert("Failed to generate flashcards");
+  }
 };
 const handleSwipeEnd = (event: any, info: any) => {
   console.log("DRAG OFFSET:", info.offset.y);
@@ -144,9 +203,7 @@ useEffect(() => {
 const handleFlashcards = async () => {
   setMode("flashcards");
 
-  if (flashcards.length === 0) {
-    await loadFlashcards();
-  }
+  await loadFlashcards(); // always reload to ensure fresh state
 };
 
 const handleChallenge = async () => {
@@ -157,7 +214,7 @@ const handleChallenge = async () => {
   }
 };
   const goNext = () => {
-    if (currentIndex >= flashcards.length - 1) {
+    if (currentIndex >= activeCards.length - 1) {
       setIsSessionComplete(true);
       return;
     }
@@ -194,7 +251,7 @@ const handleChallenge = async () => {
       return newStreak;
     });
   };
-
+/*
   const restart = async () => {
     for (const card of flashcards) {
       if (!card.id) continue;
@@ -209,10 +266,38 @@ const handleChallenge = async () => {
     setFlipped(false);
     setStreak(0);
     setIsSessionComplete(false);
-  };
+  };*/
 
-  const currentCard = flashcards[currentIndex];
+  const restart = async () => {
+  const newCards =
+    restartMode === "all"
+      ? flashcards.map((_, i) => i)
+      : flashcards
+          .map((_, i) => i)
+          .filter((i) => !knownCards.includes(i));
 
+  setSessionCards(newCards);
+
+  if (restartMode === "all") {
+    for (const card of flashcards) {
+      if (!card.id) continue;
+
+      await updateDoc(doc(db, "flashcards", card.id), {
+        known: false,
+      });
+    }
+
+    setKnownCards([]);
+  }
+
+  setCurrentIndex(0);
+  setFlipped(false);
+  setStreak(0);
+  setIsSessionComplete(false);
+};
+
+  //const currentCard = flashcards[currentIndex];
+const currentCard = flashcards[actualIndex];
 
   return (
     <div
@@ -321,7 +406,26 @@ const handleChallenge = async () => {
   />
 )}
 
-      {flashcards.length === 0 && <p>No cards found.</p>}
+      {flashcards.length === 0 && mode === "flashcards" && (
+  <div style={{ marginTop: "20px", textAlign: "center" }}>
+    <p>No cards found.</p>
+
+    <button
+      onClick={handleGenerateFlashcards}
+      style={{
+        marginTop: "10px",
+        padding: "10px 16px",
+        borderRadius: "8px",
+        border: "none",
+        background: "#2563eb",
+        color: "white",
+        cursor: "pointer",
+      }}
+    >
+      Generate Flashcards
+    </button>
+  </div>
+)}
       {mode === "challenge" && challenges.length > 0 && (
   <motion.div
   key={challengeIndex}
@@ -429,7 +533,7 @@ const handleChallenge = async () => {
           </p>
 
           <p>
-            Card {currentIndex + 1} / {flashcards.length}
+            Card {currentIndex + 1} / {activeCards.length}
           </p>
 
           {/* ACTION */}
@@ -440,7 +544,7 @@ const handleChallenge = async () => {
       onClick={async (e) => {
         e.stopPropagation();
 
-        const card = flashcards[currentIndex];
+        const card = flashcards[actualIndex];
         if (!card?.id) return;
 
         await updateDoc(doc(db, "flashcards", card.id), {
@@ -487,9 +591,7 @@ const handleChallenge = async () => {
           <div style={{ marginTop: "30px", display: "flex", gap: "10px" }}>
             <button onClick={goPrev}>Prev</button>
             <button onClick={goNext}>
-              {currentIndex === flashcards.length - 1
-                ? "Finish"
-                : "Next"}
+              {currentIndex === activeCards.length - 1 ? "Finish" : "Next"}
             </button>
           </div>
         </>
