@@ -1,0 +1,244 @@
+body {
+  margin: 0;
+  background: #eef1f6; /* softer, more modern */
+  font-family: Arial, sans-serif;
+}
+
+.app-container {
+  min-height: 100vh;
+  padding-bottom: 80px;
+}
+
+/* GRID */
+.deck-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+  padding: 16px;
+}
+
+/* CARD */
+.deck-card {
+  background: white;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+/* IMAGE */
+.deck-image {
+  width: 100%;
+  height: 120px;
+  object-fit: cover;
+}
+
+/* TEXT */
+.deck-content {
+  padding: 10px;
+}
+
+.deck-title {
+  font-weight: bold;
+}
+
+.deck-subject {
+  font-size: 12px;
+  color: gray;
+}
+
+/* NAV */
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 70px;
+  background: white;
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  border-top: 1px solid #ddd;
+}
+/* ===== HEADER UPGRADE ===== */
+
+.title {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+}
+
+.subtitle {
+  font-size: 13px;
+  color: #888;
+  margin-top: 2px;
+}
+
+/* ===== SEARCH BAR UPGRADE ===== */
+
+.search-wrapper {
+  margin-top: 14px;
+}
+
+.search-bar {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: none;
+  background: #f1f2f6;
+  font-size: 14px;
+  outline: none;
+
+  /* FORCE remove browser styles */
+  appearance: none;
+  -webkit-appearance: none;
+  box-shadow: none;
+}
+.header-top {
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.header-text {
+  flex: 1;
+  margin-left: 10px;
+}
+/* ===== BOTTOM SHEET ===== */
+.bottom-sheet {
+  width: 100%;
+  max-width: 420px;
+
+  background: #ffffff; /* pure white */
+
+  border-radius: 24px;
+  padding: 24px;
+
+  box-shadow: 0 20px 50px rgba(0,0,0,0.25); /* stronger depth */
+
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+
+  animation: slideUp 0.3s ease;
+}
+
+/* ===== OVERLAY ===== */
+.sheet-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+
+  background: rgba(0,0,0,0.15);
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  z-index: 1000;
+}
+
+/* ===== ANIMATION ===== */
+@keyframes slideUp {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+.input-field {
+  width: 90%;              /* ⬅️ key change */
+  max-width: 350px;        /* prevents over-stretching */
+
+  margin: 0 auto;          /* centers horizontally */
+
+  padding: 16px;
+  border-radius: 14px;
+  border: none;
+  background: #f5f6fa;
+  font-size: 15px;
+  outline: none;
+}
+.create-btn {
+  width: auto;              /* ⬅️ key fix */
+  padding: 12px 24px;       /* balanced size */
+
+  margin: 10px auto 0;      /* center it */
+
+  background: #4f7cff;
+  color: white;
+  border: none;
+  border-radius: 14px;
+
+  font-size: 15px;
+  font-weight: 600;
+
+  cursor: pointer;
+
+  display: block;           /* needed for centering */
+}
+
+.create-btn:active {
+  transform: scale(0.97);
+  opacity: 0.9;
+}
+.sheet-header {
+  font-size: 18px;
+  font-weight: 600;
+  text-align: center;
+  margin-bottom: 10px;
+}
+
+.sheet-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.sheet-title {
+  font-size: 18px;
+  font-weight: 600;
+  text-align: center;
+  margin-bottom: 16px;
+}
+
+.sheet-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;   /* THIS creates spacing between inputs */
+}
+
+.fab {
+  width: 44px;
+  height: 44px;
+
+  background: #4f7cff;
+  color: white;
+
+  border-radius: 50%;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  font-size: 22px;
+  font-weight: 500;
+
+  cursor: pointer;
+
+  box-shadow: 0 6px 16px rgba(0,0,0,0.2);
+
+  transition: transform 0.15s ease, box-shadow 0.2s ease;
+}
+
+.fab:active {
+  transform: scale(0.9);
+  box-shadow: 0 3px 8px rgba(0,0,0,0.2);
+}
+
+.deck-card.selected {
+  border: 2px solid #3b82f6;
+  transform: scale(0.98);
+}

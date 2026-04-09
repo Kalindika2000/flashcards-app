@@ -1,0 +1,591 @@
+/*This is the page where notes anf relted flashcards are displayed for study. Navigationis via Decks-Notes */
+"use client";
+
+import ModeSelection from "@/components/ModeSelection";
+import TopSwitch from "@/components/TopSwitch";
+import { Suspense } from "react";
+import { useState, useEffect } from "react";
+import { motion } from "framer-motion";
+import { useSearchParams, useRouter } from "next/navigation";
+import { db } from "@/lib/firebase";
+import { generateChallengeClips } from "@/lib/challengeGeneratorUtil";
+import BottomNav from "@/components/BottomNav";
+import type { Challenge } from "@/lib/challengeGeneratorUtil";
+import {
+  collection,
+  getDocs,
+  doc,
+  updateDoc,
+  query,
+  where,
+} from "firebase/firestore";
+
+type FlashcardType = {
+  id?: string;
+  question: string;
+  answer: string;
+  noteId?: string;
+};
+
+//export default function StudyPage() {
+  function StudyPage() {
+  const [isNotesOpen, setIsNotesOpen] = useState(true);
+  const [mode, setMode] = useState<"flashcards" | "challenge" | null>(null);
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const noteId = searchParams.get("noteId");
+
+  const [flashcards, setFlashcards] = useState<FlashcardType[]>([]);
+  const [challenges, setChallenges] = useState<Challenge[]>([]);
+const [challengeIndex, setChallengeIndex] = useState(0);
+const [showChallengeAnswer, setShowChallengeAnswer] = useState(false);
+  const [note, setNote] = useState<{
+  title: string;
+  content: string;
+} | null>(null);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [flipped, setFlipped] = useState(false);
+  const [knownCards, setKnownCards] = useState<number[]>([]);
+  const [streak, setStreak] = useState(0);
+  const [bestStreak, setBestStreak] = useState(0);
+  const [isSessionComplete, setIsSessionComplete] = useState(false);
+const [restartMode, setRestartMode] = useState<"all" | "difficult">("all");
+const someKnown = knownCards.length > 0;
+const allMastered = knownCards.length === flashcards.length;
+
+const activeCards = flashcards.map((_, i) => i);
+const actualIndex = activeCards[currentIndex] ?? currentIndex;
+
+  // ✅ LOAD ONLY CARDS FOR THIS NOTE
+  const loadFlashcards = async () => {
+    if (!noteId) return;
+
+    const q = query(
+      collection(db, "flashcards"),
+      where("noteId", "==", noteId)
+    );
+
+    const snapshot = await getDocs(q);
+
+    const cards = snapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...(doc.data() as FlashcardType),
+    }));
+
+    setFlashcards(cards);
+  };
+const handleGenerateChallenges = async () => {
+  if (!note?.content) return;
+
+  console.log("Generating challenge clips...");
+
+  const result = await generateChallengeClips(note.content);
+
+  console.log("Challenge result:", result);
+
+  setChallenges(result);
+  setChallengeIndex(0);
+  setShowChallengeAnswer(false);
+};
+const handleSwipeEnd = (event: any, info: any) => {
+  console.log("DRAG OFFSET:", info.offset.y);
+
+  const threshold =60;
+
+  if (info.offset.y < -threshold) {
+    if (challengeIndex < challenges.length - 1) {
+      setChallengeIndex((prev) => prev + 1);
+      setShowChallengeAnswer(false);
+    }
+  }
+
+  if (info.offset.y > threshold) {
+    if (challengeIndex > 0) {
+      setChallengeIndex((prev) => prev - 1);
+      setShowChallengeAnswer(false);
+    }
+  }
+};
+ /* useEffect(() => {
+  if (!noteId) return;
+
+  loadFlashcards();
+
+  const fetchNote = async () => {
+    const docRef = doc(db, "notes", noteId);
+    const snapshot = await getDocs(
+      query(collection(db, "notes"), where("__name__", "==", noteId))
+    );
+
+    if (!snapshot.empty) {
+      setNote(snapshot.docs[0].data() as any);
+    }
+  };
+
+  fetchNote();
+}, [noteId]);*/
+useEffect(() => {
+  if (!noteId) return;
+
+  const fetchNote = async () => {
+    const docRef = doc(db, "notes", noteId);
+    const snapshot = await getDocs(
+      query(collection(db, "notes"), where("__name__", "==", noteId))
+    );
+
+    if (!snapshot.empty) {
+      setNote(snapshot.docs[0].data() as any);
+    }
+  };
+
+  fetchNote();
+}, [noteId]);
+
+const handleFlashcards = async () => {
+  setMode("flashcards");
+
+  if (flashcards.length === 0) {
+    await loadFlashcards();
+  }
+};
+
+const handleChallenge = async () => {
+  setMode("challenge");
+
+  if (challenges.length === 0) {
+    await handleGenerateChallenges();
+  }
+};
+  const goNext = () => {
+    if (currentIndex >= flashcards.length - 1) {
+      setIsSessionComplete(true);
+      return;
+    }
+
+    setFlipped(false);
+
+    if (!knownCards.includes(actualIndex)) {
+      setStreak(0);
+    }
+
+    setCurrentIndex((prev) => prev + 1);
+  };
+
+  const goPrev = () => {
+    setFlipped(false);
+    setCurrentIndex((prev) => (prev > 0 ? prev - 1 : prev));
+  };
+
+  const markKnown = async () => {
+    const card = flashcards[actualIndex];
+    if (!card?.id) return;
+
+    await updateDoc(doc(db, "flashcards", card.id), {
+      known: true,
+    });
+
+    setKnownCards((prev) =>
+  prev.includes(actualIndex) ? prev : [...prev, actualIndex]
+);
+
+    setStreak((prev) => {
+      const newStreak = prev + 1;
+      setBestStreak((best) => (newStreak > best ? newStreak : best));
+      return newStreak;
+    });
+  };
+
+  const restart = async () => {
+    for (const card of flashcards) {
+      if (!card.id) continue;
+
+      await updateDoc(doc(db, "flashcards", card.id), {
+        known: false,
+      });
+    }
+
+    setKnownCards([]);
+    setCurrentIndex(0);
+    setFlipped(false);
+    setStreak(0);
+    setIsSessionComplete(false);
+  };
+
+  const currentCard = flashcards[currentIndex];
+
+
+  return (
+    <div
+  className="app-container"
+  style={{
+  minHeight: "100vh",
+  display: "flex",
+  flexDirection: "column",
+}}
+>
+      {/* <h1>Study</h1> */}
+
+      {/* HEADER */}
+
+<div className="header">
+  <div className="header-top">
+    <div className="menu" onClick={() => router.back()}>
+      ←
+    </div>
+
+    <div className="header-text">
+      <div className="title">Study</div>
+      <div className="subtitle">Review your cards</div>
+    </div>
+
+    <div style={{ width: "24px" }} />
+  </div>
+</div>
+<div style={{ padding: "20px", paddingBottom: "80px" }}>
+      {note && (
+  <div style={{ width: "100%", maxWidth: "500px", marginTop: "10px" }}>
+    
+   <div
+  style={{
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: "8px",
+  }}
+>
+  <div
+    onClick={() => setIsNotesOpen((prev) => !prev)}
+    style={{
+      cursor: "pointer",
+      fontWeight: "600",
+    }}
+  >
+    {isNotesOpen ? "▼ Notes" : "▶ Notes"}
+  </div>
+
+  <button
+    onClick={() => {
+  const deckId = searchParams.get("deckId") || "";
+  router.push(`/editor?noteId=${noteId}&deckId=${deckId}`);
+}}
+    style={{
+      padding: "4px 10px",
+      fontSize: "12px",
+      borderRadius: "6px",
+      border: "1px solid #ccc",
+      background: "white",
+      cursor: "pointer",
+    }}
+  >
+    ✏️ Edit
+  </button>
+</div>
+
+    {isNotesOpen && (
+      <div
+  style={{
+    marginBottom: "20px",
+    padding: "16px",
+    background: "#f9fafb",
+    borderRadius: "12px",
+    maxHeight: "30vh",
+    overflowY: "auto",
+    scrollBehavior: "smooth",
+  }}
+>
+        <div style={{ fontSize: "18px", fontWeight: "bold" }}>
+          {note.title}
+        </div>
+
+        <div
+  className="note-content"
+  style={{
+    fontSize: "14px",
+    color: "#555",
+    marginTop: "6px",
+    lineHeight: "1.6",
+  }}
+  dangerouslySetInnerHTML={{ __html: note.content }}
+/>
+      </div>
+    )}
+  </div>
+)}
+<h2 style={{ marginTop: "20px" }}>
+  Choose how you want to study
+</h2>
+{mode === null && (
+  <ModeSelection
+    onSelectFlashcards={handleFlashcards}
+    onSelectChallenge={handleChallenge}
+  />
+)}
+
+      {flashcards.length === 0 && <p>No cards found.</p>}
+      {mode === "challenge" && challenges.length > 0 && (
+  <motion.div
+  key={challengeIndex}
+  style={{
+    maxWidth: "500px",
+    width: "100%",
+    marginTop: "20px",
+    border: "2px solid #16a34a",
+    borderRadius: "12px",
+    padding: "20px",
+    touchAction: "none",
+  }}
+  drag="y"
+  dragElastic={0.2}
+  dragMomentum={true}
+  dragConstraints={{ top: 0, bottom: 0 }}
+  onDragEnd={handleSwipeEnd}
+  initial={{ y: 300, opacity: 0 }}
+  animate={{ y: 0, opacity: 1 }}
+  exit={{ y: -300, opacity: 0 }}
+  transition={{ type: "spring", stiffness: 300, damping: 30 }}
+>
+    <h3>Challenge Mode</h3>
+
+    <div style={{ textAlign: "center" }}>
+      <h2>{challenges[challengeIndex]?.hook}</h2>
+
+      <p>{challenges[challengeIndex]?.context}</p>
+
+      <p style={{ fontWeight: "bold", marginTop: "10px" }}>
+        {challenges[challengeIndex]?.question}
+      </p>
+
+      {!showChallengeAnswer ? (
+        <button
+          onClick={() => setShowChallengeAnswer(true)}
+          style={{ marginTop: "15px" }}
+        >
+          Reveal Answer
+        </button>
+      ) : (
+        <>
+          <p style={{ marginTop: "15px", fontWeight: "bold" }}>
+            Answer: {challenges[challengeIndex]?.answer}
+          </p>
+          <p>{challenges[challengeIndex]?.explanation}</p>
+        </>
+      )}
+
+      <div style={{ marginTop: "20px" }}>
+        <button
+          onClick={() => {
+            if (challengeIndex > 0) {
+              setChallengeIndex(challengeIndex - 1);
+              setShowChallengeAnswer(false);
+            }
+          }}
+          style={{ marginRight: "10px" }}
+        >
+          ⬅ Prev
+        </button>
+
+        <button
+          onClick={() => {
+            if (challengeIndex < challenges.length - 1) {
+              setChallengeIndex(challengeIndex + 1);
+              setShowChallengeAnswer(false);
+            }
+          }}
+        >
+          Next ➡
+        </button>
+                  </div>
+    </div>
+  </motion.div>
+)}
+      {mode === "flashcards" && flashcards.length > 0 && !isSessionComplete && (
+        <>
+          {/* CARD */}
+          <div
+            onClick={() => setFlipped(!flipped)}
+            style={{
+              width: "100%",
+              maxWidth: "500px",
+              height: "200px",
+              background: "#e5e5e5",
+              borderRadius: "16px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "20px",
+              textAlign: "center",
+              cursor: "pointer",
+              marginTop: "40px",
+            }}
+          >
+            <div style={{ fontSize: "18px", fontWeight: "600" }}>
+              {flipped ? currentCard?.answer : currentCard?.question}
+            </div>
+          </div>
+
+          {/* STATS */}
+          <p style={{ marginTop: "20px" }}>
+            🔥 {streak} | 🏆 {bestStreak}
+          </p>
+
+          <p>
+            Card {currentIndex + 1} / {flashcards.length}
+          </p>
+
+          {/* ACTION */}
+          {flipped && (
+  <div style={{ marginTop: "20px" }}>
+    <button
+      disabled={knownCards.includes(actualIndex)}
+      onClick={async (e) => {
+        e.stopPropagation();
+
+        const card = flashcards[currentIndex];
+        if (!card?.id) return;
+
+        await updateDoc(doc(db, "flashcards", card.id), {
+          known: true,
+        });
+
+        setKnownCards((prev) =>
+          prev.includes(currentIndex)
+            ? prev
+            : [...prev, actualIndex]
+        );
+
+        setStreak((prev) => {
+          const newStreak = prev + 1;
+          setBestStreak((best) =>
+            newStreak > best ? newStreak : best
+          );
+          return newStreak;
+        });
+      }}
+      style={{
+        padding: "10px 16px",
+        borderRadius: "8px",
+        border: "none",
+        background: knownCards.includes(actualIndex)
+          ? "#9ca3af"
+          : "#22c55e",
+        color: "white",
+        cursor: knownCards.includes(actualIndex)
+          ? "not-allowed"
+          : "pointer",
+        opacity: knownCards.includes(actualIndex) ? 0.7 : 1,
+      }}
+    >
+      ✅{" "}
+      {knownCards.includes(actualIndex)
+        ? "✔ Known"
+        : "I know this"}
+    </button>
+  </div>
+)}
+
+          {/* NAV */}
+          <div style={{ marginTop: "30px", display: "flex", gap: "10px" }}>
+            <button onClick={goPrev}>Prev</button>
+            <button onClick={goNext}>
+              {currentIndex === flashcards.length - 1
+                ? "Finish"
+                : "Next"}
+            </button>
+          </div>
+        </>
+      )}
+
+      {/* COMPLETE */}
+      {mode === "flashcards" && isSessionComplete && flashcards.length > 0 && (
+  <div style={{ marginTop: "40px", textAlign: "center" }}>
+    <h2>🎉 Session Complete!</h2>
+
+{allMastered ? (
+  <p>You’ve mastered all flashcards.</p>
+) : (
+  <p>You’ve reviewed all cards.</p>
+)}
+    {!allMastered && someKnown && (
+      <div style={{ marginTop: "20px" }}>
+        <label>
+          <input
+            type="radio"
+            value="all"
+            checked={restartMode === "all"}
+            onChange={() => setRestartMode("all")}
+          />
+          All cards
+        </label>
+
+        <label style={{ marginLeft: "12px" }}>
+          <input
+            type="radio"
+            value="difficult"
+            checked={restartMode === "difficult"}
+            onChange={() => setRestartMode("difficult")}
+          />
+          Difficult cards only
+        </label>
+      </div>
+    )}
+
+    <button
+      onClick={restart}
+      style={{
+        marginTop: "20px",
+        padding: "10px 20px",
+        borderRadius: "10px",
+        border: "none",
+        background: "#2563eb",
+        color: "white",
+        cursor: "pointer",
+      }}
+    >
+      Restart
+    </button>
+  </div>
+)}
+    <style jsx>{`
+  .note-content :global(p) {
+    margin-bottom: 10px;
+  }
+
+  .note-content :global(ul) {
+    padding-left: 20px;
+    margin-bottom: 10px;
+  }
+
+  .note-content :global(li) {
+    margin-bottom: 6px;
+  }
+
+  .note-content :global(h1),
+  .note-content :global(h2),
+  .note-content :global(h3) {
+    font-weight: bold;
+    margin-top: 10px;
+    margin-bottom: 6px;
+  }
+
+  .note-content :global(strong) {
+    font-weight: 600;
+  }
+`}</style>
+</div>
+<BottomNav
+  onAdd={() => {
+    const deckId = searchParams.get("deckId") || "";
+    router.push(`/editor?deckId=${deckId}`);
+  }}
+/>
+</div>
+//</main>
+);
+}
+export default function StudyPageWrapper() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <StudyPage />
+    </Suspense>
+  );
+}
