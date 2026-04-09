@@ -205,7 +205,12 @@ const handleFlashcards = async () => {
 
   await loadFlashcards(); // always reload to ensure fresh state
 };
-
+const resetMode = () => {
+  setMode(null);
+  setCurrentIndex(0);
+  setFlipped(false);
+  setIsSessionComplete(false);
+};
 const handleChallenge = async () => {
   setMode("challenge");
 
@@ -427,6 +432,11 @@ const currentCard = flashcards[actualIndex];
   </div>
 )}
       {mode === "challenge" && challenges.length > 0 && (
+         <>
+    <button onClick={resetMode}>
+      ← Back to modes
+    </button>
+
   <motion.div
   key={challengeIndex}
   style={{
@@ -501,10 +511,14 @@ const currentCard = flashcards[actualIndex];
                   </div>
     </div>
   </motion.div>
+</>
 )}
       {mode === "flashcards" && flashcards.length > 0 && !isSessionComplete && (
         <>
           {/* CARD */}
+          <button onClick={resetMode}>
+          ← Back to modes
+        </button>
           <div
             onClick={() => setFlipped(!flipped)}
             style={{
