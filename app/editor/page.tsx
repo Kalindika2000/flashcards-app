@@ -45,6 +45,7 @@ const [challenges, setChallenges] = useState<Challenge[]>([]);
   const [title, setTitle] = useState("");
   const [isDirty, setIsDirty] = useState(false);
   const [showLeaveModal, setShowLeaveModal] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
   useEffect(() => {
   if (!noteId) return;
 
@@ -116,19 +117,50 @@ const [challenges, setChallenges] = useState<Challenge[]>([]);
   const [sessionCards, setSessionCards] = useState<number[]>(() => []);
   const [isSessionComplete, setIsSessionComplete] = useState(false);
   
-  const saveNote = async () => {
-  const docRef = await addDoc(collection(db, "notes"), {
-  title: title,
-  content: notes,
-  deckId: deckId,
-  createdAt: serverTimestamp(),
+ 
 
-  totalCards: 0,
-  knownCards: 0,
-});
+const saveNote = async () => {
+  const docRef = await addDoc(collection(db, "notes"), {
+    title: title,
+    content: notes,
+    deckId: deckId,
+    createdAt: serverTimestamp(),
+    totalCards: 0,
+    knownCards: 0,
+  });
 
   return docRef.id;
 };
+
+const handleSave = async () => {
+  if (!title.trim()) {
+    setErrorMessage("Please enter a title");
+    return;
+  }
+
+  const plainText = notes.replace(/<[^>]*>/g, "").trim();
+
+if (!plainText) {
+  setErrorMessage("Please enter content");
+  return;
+}
+
+  let currentNoteId = noteId;
+
+  if (!currentNoteId) {
+    currentNoteId = await saveNote();
+  } else {
+    await updateDoc(doc(db, "notes", currentNoteId), {
+      title: title,
+      content: notes,
+    });
+  }
+
+  setIsDirty(false);
+  router.push(`/deck/${deckId}`);
+};
+
+
   //SAVE FLASHCARDS
 const saveFlashcards = async (cards: FlashcardType[], noteId: string) => {
   try {
@@ -198,7 +230,8 @@ const deleteFlashcardsForNote = async (noteId: string) => {
 };
   const generateFlashcards = async () => {
     let currentNoteId = noteId;
-  if (!notes.trim()) return;
+  const plainText = notes.replace(/<[^>]*>/g, "").trim();
+if (!plainText) return;
 
 if (!title.trim()) {
   alert("Please enter a note title");
@@ -376,34 +409,10 @@ const sessionComplete =
   <h1 style={{ margin: 0 }}>Flashcards</h1>
 
   <button
-    onClick={async () => {
-      if (!title.trim()) {
-        alert("Please enter a title");
-        return;
-      }
-
-      if (!notes.trim()) {
-        alert("Please enter content");
-        return;
-      }
-
-      let currentNoteId = noteId;
-
-      if (!currentNoteId) {
-        // CREATE
-        currentNoteId = await saveNote();
-      } else {
-        // EDIT
-        await updateDoc(doc(db, "notes", currentNoteId), {
-          title: title,
-          content: notes,
-        });
-      }
-
-      // ✅ EXIT TO NOTES PAGE
-      setIsDirty(false);
-      router.push(`/deck/${deckId}`);
-    }}
+    
+      onClick={handleSave}
+      
+  //disabled={!title.trim() || !notes.trim()}
     style={{
       padding: "8px 16px",
       borderRadius: "8px",
@@ -1029,7 +1038,54 @@ if (prevKnown !== newKnown) {
     </div>
   </div>
 )}
+{errorMessage && (
+  <div
+    style={{
+      position: "fixed",
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      background: "rgba(0,0,0,0.5)",
+      display: "flex",
+      justifyContent: "center",
+      alignItems: "center",
+      zIndex: 99999,
+    }}
+  >
+    <div
+      style={{
+        background: "white",
+        padding: "20px",
+        borderRadius: "12px",
+        width: "300px",
+        textAlign: "center",
+      }}
+    >
+      <h3 style={{ marginBottom: "10px" }}>
+        Validation Error
+      </h3>
 
+      <p style={{ marginBottom: "20px", fontSize: "14px" }}>
+        {errorMessage}
+      </p>
+
+      <button
+        onClick={() => setErrorMessage("")}
+        style={{
+          padding: "8px 16px",
+          borderRadius: "8px",
+          border: "none",
+          background: "#2563eb",
+          color: "white",
+          cursor: "pointer",
+        }}
+      >
+        OK
+      </button>
+    </div>
+  </div>
+)}
 </main>  );
 }
 export default function HomeWrapper() {
