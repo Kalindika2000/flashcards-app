@@ -60,7 +60,8 @@ const [showChallengeAnswer, setShowChallengeAnswer] = useState(false);
   const [bestStreak, setBestStreak] = useState(0);
   const [isSessionComplete, setIsSessionComplete] = useState(false);
 const [restartMode, setRestartMode] = useState<"all" | "difficult">("all");
-
+const [loading, setLoading] = useState(false);
+const [loadingMessage, setLoadingMessage] = useState("");
 
 const activeCards =
   sessionCards.length > 0
@@ -71,7 +72,7 @@ const allMastered = knownCards.length === activeCards.length;
 const actualIndex = activeCards[currentIndex] ?? currentIndex;
 
   // ✅ LOAD ONLY CARDS FOR THIS NOTE
-  const loadFlashcards = async () => {
+ /* const loadFlashcards = async () => {
     if (!noteId) return;
 
     const q = query(
@@ -87,21 +88,51 @@ const actualIndex = activeCards[currentIndex] ?? currentIndex;
     }));
 
     setFlashcards(cards);
-  };
+  };*/
+
+  const loadFlashcards = async () => {
+  if (!noteId) return;
+
+  setLoading(true);
+  setLoadingMessage("Loading your flashcards...");
+
+  const q = query(
+    collection(db, "flashcards"),
+    where("noteId", "==", noteId)
+  );
+
+  const snapshot = await getDocs(q);
+
+  const cards = snapshot.docs.map((doc) => ({
+    id: doc.id,
+    ...(doc.data() as FlashcardType),
+  }));
+
+  setFlashcards(cards);
+
+  setLoading(false);
+};
 const handleGenerateChallenges = async () => {
-  
-  
   if (!note?.content) return;
 
-  console.log("Generating challenge clips...");
+  setLoading(true);
+  setLoadingMessage("Creating challenge clips...");
 
-  const result = await generateChallengeClips(note.content);
+  try {
+    const result = await generateChallengeClips(note.content);
 
-  console.log("Challenge result:", result);
+    setLoadingMessage("Preparing your challenge session...");
 
-  setChallenges(result);
-  setChallengeIndex(0);
-  setShowChallengeAnswer(false);
+    setChallenges(result);
+    setChallengeIndex(0);
+    setShowChallengeAnswer(false);
+
+    setLoading(false);
+  } catch (err) {
+    setLoading(false);
+    console.error(err);
+    alert("Failed to generate challenges");
+  }
 };
 
 const handleGenerateFlashcards = async () => {
@@ -109,6 +140,8 @@ const handleGenerateFlashcards = async () => {
 
   const plainText = note.content.replace(/<[^>]*>/g, "").trim();
   if (!plainText) return;
+  setLoading(true);
+setLoadingMessage("Generating flashcards...");
 
   try {
     const res = await fetch("/api/generate", {
@@ -127,7 +160,7 @@ const handleGenerateFlashcards = async () => {
       alert("No flashcards returned");
       return;
     }
-
+    setLoadingMessage("Saving your flashcards...");   
     for (const card of data.flashcards) {
       await addDoc(collection(db, "flashcards"), {
         question: card.question,
@@ -139,12 +172,14 @@ const handleGenerateFlashcards = async () => {
     }
 
     await loadFlashcards();
+    //setLoading(false);
     setMode("flashcards");
 
   } catch (err) {
-    console.error(err);
-    alert("Failed to generate flashcards");
-  }
+  setLoading(false);
+  console.error(err);
+  alert("Failed to generate flashcards");
+}
 };
 const handleSwipeEnd = (event: any, info: any) => {
   console.log("DRAG OFFSET:", info.offset.y);
@@ -212,11 +247,11 @@ const resetMode = () => {
   setIsSessionComplete(false);
 };
 const handleChallenge = async () => {
-  setMode("challenge");
-
   if (challenges.length === 0) {
     await handleGenerateChallenges();
   }
+
+  setMode("challenge");
 };
   const goNext = () => {
     if (currentIndex >= activeCards.length - 1) {
@@ -404,6 +439,29 @@ const currentCard = flashcards[actualIndex];
 <h2 style={{ marginTop: "20px" }}>
   Choose how you want to study
 </h2>
+
+{loading && (
+  <div
+    style={{
+      position: "fixed",
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      background: "rgba(255,255,255,0.8)",
+      display: "flex",
+      flexDirection: "column",
+      justifyContent: "center",
+      alignItems: "center",
+      zIndex: 99999,
+    }}
+  >
+    <div className="spinner"></div>
+    <p style={{ marginTop: "12px", color: "#333", fontWeight: "500" }}>
+      {loadingMessage}
+    </p>
+  </div>
+)}
 {mode === null && (
   <ModeSelection
     onSelectFlashcards={handleFlashcards}
@@ -662,6 +720,22 @@ const currentCard = flashcards[actualIndex];
   </div>
 )}
     <style jsx>{`
+  .spinner {
+    margin: 0 auto;
+    width: 30px;
+    height: 30px;
+    border: 4px solid #ddd;
+    border-top: 4px solid #2563eb;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+  }
+
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
   .note-content :global(p) {
     margin-bottom: 10px;
   }
