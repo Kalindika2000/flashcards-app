@@ -6,7 +6,8 @@ import { Suspense } from "react";
 import dynamic from "next/dynamic";
 import type { Challenge } from "../../lib/challengeGeneratorUtil";
 import "react-quill/dist/quill.snow.css";
-import { useSearchParams } from "next/navigation";
+//import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { db } from "../../lib/firebase";
 import { collection, addDoc, serverTimestamp, getDocs, deleteDoc, doc, updateDoc, increment, query, where } from "firebase/firestore";
 import BottomNav from "@/components/BottomNav";
@@ -31,7 +32,7 @@ type FlashcardType = {
 };
 
 function Home() {
-  
+  const router = useRouter();
   const searchParams = useSearchParams();
 const deckId = searchParams.get("deckId");
 const noteId = searchParams.get("noteId");
@@ -42,6 +43,8 @@ console.log("Deck ID in study screen:", deckId);
 const [challenges, setChallenges] = useState<Challenge[]>([]);
 
   const [title, setTitle] = useState("");
+  const [isDirty, setIsDirty] = useState(false);
+  const [showLeaveModal, setShowLeaveModal] = useState(false);
   useEffect(() => {
   if (!noteId) return;
 
@@ -60,6 +63,18 @@ const [challenges, setChallenges] = useState<Challenge[]>([]);
 
   fetchNote();
 }, [noteId]);
+<BottomNav
+  showAdd={false}
+  onHome={() => {
+  if (isDirty) {
+    setShowLeaveModal(true);
+    return;
+  }
+
+  router.push("/");
+}}
+/>
+
   const [lastGeneratedNotes, setLastGeneratedNotes] = useState("");
   const [flashcards, setFlashcards] = useState<FlashcardType[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -356,12 +371,58 @@ const sessionComplete =
     marginBottom: "40px",
   }}
 >
-        <h1 style={{ textAlign: "center", marginBottom: "20px" }}>
-          Flashcards
-        </h1>
+       
+<div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+  <h1 style={{ margin: 0 }}>Flashcards</h1>
+
+  <button
+    onClick={async () => {
+      if (!title.trim()) {
+        alert("Please enter a title");
+        return;
+      }
+
+      if (!notes.trim()) {
+        alert("Please enter content");
+        return;
+      }
+
+      let currentNoteId = noteId;
+
+      if (!currentNoteId) {
+        // CREATE
+        currentNoteId = await saveNote();
+      } else {
+        // EDIT
+        await updateDoc(doc(db, "notes", currentNoteId), {
+          title: title,
+          content: notes,
+        });
+      }
+
+      // ✅ EXIT TO NOTES PAGE
+      setIsDirty(false);
+      router.push(`/deck/${deckId}`);
+    }}
+    style={{
+      padding: "8px 16px",
+      borderRadius: "8px",
+      border: "none",
+      background: "#16a34a",
+      color: "white",
+      cursor: "pointer",
+    }}
+  >
+    Save
+  </button>
+</div>
+        
         <input
   value={title}
-  onChange={(e) => setTitle(e.target.value)}
+  onChange={(e) => {
+  setTitle(e.target.value);
+  setIsDirty(true);
+}}
   placeholder="Enter note title (e.g. Photosynthesis)"
   style={{
     width: "100%",
@@ -388,7 +449,10 @@ const sessionComplete =
 
         <ReactQuill
   value={notes}
-  onChange={setNotes}
+ onChange={(value) => {
+  setNotes(value);
+  setIsDirty(true);
+}}
   style={{
     width: "100%",
     marginBottom: "12px",
@@ -887,10 +951,86 @@ if (prevKnown !== newKnown) {
         }
       `}</style>
 
-<BottomNav showAdd={false} />
+<BottomNav
+  showAdd={false}
+  onHome={() => {
+  if (isDirty) {
+    setShowLeaveModal(true);
+    return;
+  }
 
-</main>
-  );
+  router.push("/");
+}}
+/>
+
+{showLeaveModal && (
+  <div
+    style={{
+      position: "fixed",
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      background: "rgba(0,0,0,0.5)",
+      display: "flex",
+      justifyContent: "center",
+      alignItems: "center",
+      zIndex: 99999,
+    }}
+  >
+    <div
+      style={{
+        background: "white",
+        padding: "20px",
+        borderRadius: "12px",
+        width: "300px",
+        textAlign: "center",
+      }}
+    >
+      <h3 style={{ marginBottom: "10px" }}>
+        Unsaved changes
+      </h3>
+
+      <p style={{ marginBottom: "20px", fontSize: "14px" }}>
+        You have unsaved changes. Are you sure you want to leave?
+      </p>
+
+      <div style={{ display: "flex", justifyContent: "space-between" }}>
+        <button
+          onClick={() => setShowLeaveModal(false)}
+          style={{
+            padding: "8px 16px",
+            borderRadius: "8px",
+            border: "1px solid #ccc",
+            background: "white",
+            cursor: "pointer",
+          }}
+        >
+          Cancel
+        </button>
+
+        <button
+          onClick={() => {
+            setShowLeaveModal(false);
+            router.push("/");
+          }}
+          style={{
+            padding: "8px 16px",
+            borderRadius: "8px",
+            border: "none",
+            background: "#dc2626",
+            color: "white",
+            cursor: "pointer",
+          }}
+        >
+          Leave
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
+</main>  );
 }
 export default function HomeWrapper() {
   return (

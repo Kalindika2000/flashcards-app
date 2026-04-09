@@ -6,11 +6,13 @@ import { useRouter } from "next/navigation";
 type BottomNavProps = {
   onAdd?: () => void;
   showAdd?: boolean;
+  onHome?: () => void;
 };
 
 //const BottomNav: React.FC<BottomNavProps> = ({ onAdd }) => {
 //export default function BottomNav({ onAdd }: BottomNavProps) {
-  export default function BottomNav({ onAdd, showAdd = true }: BottomNavProps) {
+  //export default function BottomNav({ onAdd, showAdd = true }: BottomNavProps) {
+    export default function BottomNav({ onAdd, showAdd = true, onHome }: BottomNavProps) {
   const router = useRouter();
   console.log("onAdd is:", onAdd);
   //const router = useRouter();
@@ -35,7 +37,13 @@ type BottomNavProps = {
     >
       {/* HOME */}
       <div
-  onClick={() => router.push("/")}
+  onClick={() => {
+  if (onHome) {
+    onHome();
+  } else {
+    router.push("/");
+  }
+}}
   style={{ textAlign: "center", cursor: "pointer" }}
 >
   Home
@@ -45,7 +53,7 @@ type BottomNavProps = {
      
 {showAdd && (
   <div
-    onClick={onAdd}
+    onClick={() => onAdd && onAdd()}
     style={{ textAlign: "center", cursor: "pointer" }}
   >
     Add
@@ -53,5 +61,6 @@ type BottomNavProps = {
 )}
     </div>
   );
-};
+    };
+
 
