@@ -653,23 +653,40 @@ const currentCard = flashcards[actualIndex];
           <button onClick={resetMode}>
           ← Back to modes
         </button>
-          <div
-            onClick={() => setFlipped(!flipped)}
-            style={{
-              width: "100%",
-              maxWidth: "500px",
-              height: "200px",
-              background: "#e5e5e5",
-              borderRadius: "16px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              padding: "20px",
-              textAlign: "center",
-              cursor: "pointer",
-              marginTop: "40px",
-            }}
-          >
+         <div
+  onClick={() => setFlipped(!flipped)}
+  style={{
+    width: "100%",
+    maxWidth: "500px",
+    height: "200px",
+    background: "#e5e5e5",
+    borderRadius: "16px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "20px",
+    textAlign: "center",
+    cursor: "pointer",
+    marginTop: "40px",
+    position: "relative",
+  }}
+>
+  {currentCard?.known && (
+    <div
+      style={{
+        position: "absolute",
+        top: "10px",
+        right: "10px",
+        fontSize: "12px",
+        background: "#22c55e",
+        color: "white",
+        padding: "4px 8px",
+        borderRadius: "6px",
+      }}
+    >
+      Known
+    </div>
+  )}
             <div style={{ fontSize: "18px", fontWeight: "600" }}>
               {flipped ? currentCard?.answer : currentCard?.question}
             </div>
@@ -688,49 +705,57 @@ const currentCard = flashcards[actualIndex];
           {flipped && (
   <div style={{ marginTop: "20px" }}>
     <button
-      disabled={knownCards.includes(actualIndex)}
       onClick={async (e) => {
         e.stopPropagation();
 
         const card = flashcards[actualIndex];
         if (!card?.id) return;
 
+        const newKnownState = !card.known;
+
         await updateDoc(doc(db, "flashcards", card.id), {
-          known: true,
+          known: newKnownState,
         });
 
-        setKnownCards((prev) =>
-          prev.includes(currentIndex)
-            ? prev
-            : [...prev, actualIndex]
+        // ✅ update local flashcards state (critical)
+        setFlashcards((prev) =>
+          prev.map((c, i) =>
+            i === actualIndex ? { ...c, known: newKnownState } : c
+          )
         );
 
-        setStreak((prev) => {
-          const newStreak = prev + 1;
-          setBestStreak((best) =>
-            newStreak > best ? newStreak : best
-          );
-          return newStreak;
-        });
+        // ✅ keep knownCards in sync (for now)
+        setKnownCards((prev) =>
+          newKnownState
+            ? prev.includes(actualIndex)
+              ? prev
+              : [...prev, actualIndex]
+            : prev.filter((i) => i !== actualIndex)
+        );
+
+        // ✅ streak logic
+        if (newKnownState) {
+          setStreak((prev) => {
+            const newStreak = prev + 1;
+            setBestStreak((best) =>
+              newStreak > best ? newStreak : best
+            );
+            return newStreak;
+          });
+        } else {
+          setStreak(0);
+        }
       }}
       style={{
         padding: "10px 16px",
         borderRadius: "8px",
         border: "none",
-        background: knownCards.includes(actualIndex)
-          ? "#9ca3af"
-          : "#22c55e",
+        background: currentCard?.known ? "#ef4444" : "#22c55e",
         color: "white",
-        cursor: knownCards.includes(actualIndex)
-          ? "not-allowed"
-          : "pointer",
-        opacity: knownCards.includes(actualIndex) ? 0.7 : 1,
+        cursor: "pointer",
       }}
     >
-      ✅{" "}
-      {knownCards.includes(actualIndex)
-        ? "✔ Known"
-        : "I know this"}
+      {currentCard?.known ? "❌ Mark as difficult" : "✅ I know this"}
     </button>
   </div>
 )}
