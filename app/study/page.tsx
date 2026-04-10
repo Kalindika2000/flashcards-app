@@ -35,6 +35,7 @@ type FlashcardType = {
   question: string;
   answer: string;
   noteId?: string;
+  known?: boolean;
 };
 
 //export default function StudyPage() {
@@ -109,7 +110,11 @@ const actualIndex = activeCards[currentIndex] ?? currentIndex;
   }));
 
   setFlashcards(cards);
-
+/*setKnownCards(
+  cards
+    .map((card, index) => (card.known ? index : -1))
+    .filter((i) => i !== -1)
+);*/
   setLoading(false);
 };
 const handleGenerateChallenges = async () => {
@@ -301,6 +306,7 @@ const handleChallenge = async () => {
       });
     }
 
+  
     setKnownCards([]);
     setCurrentIndex(0);
     setFlipped(false);
@@ -308,13 +314,83 @@ const handleChallenge = async () => {
     setIsSessionComplete(false);
   };*/
 
-  const restart = async () => {
+
+const restart = async () => {
+  if (!noteId) return;
+
+  setLoading(true);
+  setLoadingMessage("Refreshing your cards...");
+
+  // 🔁 ALWAYS FETCH FRESH DATA FROM DB
+  const q = query(
+    collection(db, "flashcards"),
+    where("noteId", "==", noteId)
+  );
+
+  const snapshot = await getDocs(q);
+
+  //const freshCards = snapshot.docs.map((doc) => {
+    const freshCards: FlashcardType[] = snapshot.docs.map((doc) => {
+  const data = doc.data() as any;
+
+  return {
+    id: doc.id,
+    question: data.question,
+    answer: data.answer,
+    noteId: data.noteId,
+    known: data.known ?? false,
+  };
+});
+
+  // ✅ update local state with fresh DB data
+  setFlashcards(freshCards);
+
+  let newCards: number[];
+
+  if (restartMode === "all") {
+    // RESET DB FLAGS
+    for (const card of freshCards) {
+      if (!card.id) continue;
+
+      await updateDoc(doc(db, "flashcards", card.id), {
+        known: false,
+      });
+    }
+
+    newCards = freshCards.map((_, i) => i);
+
+    setKnownCards([]);
+  } else {
+    // ✅ FILTER USING DB VALUE (NOT local state)
+    newCards = freshCards
+      .map((card, i) => (card.known ? -1 : i))
+      .filter((i) => i !== -1);
+  }
+
+  setSessionCards(newCards);
+  setCurrentIndex(0);
+  setFlipped(false);
+  setStreak(0);
+  setIsSessionComplete(false);
+
+  setLoading(false);
+};
+
+
+ /* const restart = async () => {
   const newCards =
     restartMode === "all"
       ? flashcards.map((_, i) => i)
       : flashcards
           .map((_, i) => i)
           .filter((i) => !knownCards.includes(i));
+
+          const newCards =
+  restartMode === "all"
+    ? flashcards.map((_, i) => i)
+    : flashcards
+        .map((card, i) => (card.known ? -1 : i))
+        .filter((i) => i !== -1);
 
   setSessionCards(newCards);
 
@@ -334,7 +410,7 @@ const handleChallenge = async () => {
   setFlipped(false);
   setStreak(0);
   setIsSessionComplete(false);
-};
+};*/
 
   //const currentCard = flashcards[currentIndex];
 const currentCard = flashcards[actualIndex];
