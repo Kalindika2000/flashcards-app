@@ -63,6 +63,7 @@ const [challenges, setChallenges] = useState<Challenge[]>([]);
       setTitle(data.title || "");
       setNotes(data.content || "");
       setOriginalNotes(data.content || "");
+      setIsDirty(false);
     }
   };
 
@@ -80,7 +81,7 @@ const [challenges, setChallenges] = useState<Challenge[]>([]);
 }}
 />
 
-  const [lastGeneratedNotes, setLastGeneratedNotes] = useState("");
+  //const [lastGeneratedNotes, setLastGeneratedNotes] = useState("");
   const [flashcards, setFlashcards] = useState<FlashcardType[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showAnswer, setShowAnswer] = useState(false);
@@ -289,109 +290,7 @@ const handleGoToStudy = async () => {
 
   router.push(`/study?deckId=${deckId}&noteId=${noteId}`);
 };
-  const generateFlashcards = async () => {
-    let currentNoteId = noteId;
-  const plainText = notes.replace(/<[^>]*>/g, "").trim();
-if (!plainText) return;
-
-if (!title.trim()) {
-  alert("Please enter a note title");
-  return;
-}
-
-  if (!deckId) {
-  alert("No deck selected");
-  return;
-}
-    setLoading(true);
-    setLoadingMessage("Reading your notes...");
-
-    try {
-      await new Promise((res) => setTimeout(res, 800));
-      setLoadingMessage("Creating flashcards...");
-
-      const res = await fetch("/api/generate", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ notes }),
-      });
-
-      if (!res.ok) throw new Error("API failed");
-
-      const data = await res.json();
-      
-      if (!data.flashcards || data.flashcards.length === 0) {
-        alert("No flashcards returned");
-        return;
-      }
-
-      //let currentNoteId = noteId;
-
-if (!currentNoteId) {
-  // 🆕 CREATE MODE
-  currentNoteId = await saveNote();
-} else {
-  // ✏️ EDIT MODE
-
-  // confirm overwrite (safe UX)
-  const confirmReplace = window.confirm(
-    "This will replace existing flashcards. Continue?"
-  );
-  if (!confirmReplace) return;
-
-  // 1. update note
-  await updateDoc(doc(db, "notes", currentNoteId), {
-    title: title,
-    content: notes,
-  });
-
-  // 2. delete old flashcards
-  const { totalDeleted, knownDeleted } =
-    await deleteFlashcardsForNote(currentNoteId);
-
-  // 3. reset note stats
-  await updateDoc(doc(db, "notes", currentNoteId), {
-    totalCards: 0,
-    knownCards: 0,
-  });
-
-  // 4. adjust deck stats
-  if (deckId) {
-    await updateDoc(doc(db, "decks", deckId), {
-      totalCards: increment(-totalDeleted),
-      knownCards: increment(-knownDeleted),
-    });
-  }
-}
-      await saveFlashcards(data.flashcards, currentNoteId);
-await loadFlashcards(currentNoteId);
-      setCurrentIndex(0);
-      setFlipped(false);
-      setKnownCards([]);
-      setLastGeneratedNotes(notes);
-    } catch (err) {
-      console.error(err);
-      alert("Something went wrong. Check console.");
-    } finally {
-      setLoading(false);
-    }
-  };
-const handleGenerateChallenges = async () => {
-  console.log("CLICKED BUTTON");
-  if (!notes) return;
-
-  const result: Challenge[] = await generateChallengeClips(notes);
-
-console.log("RESULT:", result);
-
-  console.log("RESULT:", result); // 👈 ADD THIS
-
-  setChallenges(result);
-setCurrentIndex(0);
-setShowAnswer(false);
-};
+  
  const goNext = () => {
   if (activeCards.length === 0) return;
 
@@ -490,8 +389,17 @@ const sessionComplete =
         <input
   value={title}
   onChange={(e) => {
-  setTitle(e.target.value);
-  setIsDirty(true);
+  const newTitle = e.target.value;
+  setTitle(newTitle);
+
+  const isTitleChanged = newTitle.trim() !== (title || "").trim();
+  const normalize = (text: string) =>
+    text.replace(/<[^>]*>/g, "").trim();
+
+  const isContentChanged =
+    normalize(notes) !== normalize(originalNotes);
+
+  setIsDirty(isTitleChanged || isContentChanged);
 }}
   placeholder="Enter note title (e.g. Photosynthesis)"
   style={{
@@ -521,7 +429,13 @@ const sessionComplete =
   value={notes}
  onChange={(value) => {
   setNotes(value);
-  setIsDirty(true);
+
+  const normalize = (text: string) =>
+    text.replace(/<[^>]*>/g, "").trim();
+
+  setIsDirty(
+    normalize(value) !== normalize(originalNotes)
+  );
 }}
   style={{
     width: "100%",
@@ -529,54 +443,8 @@ const sessionComplete =
   }}
 />
 
-        <div style={{ display: "flex", justifyContent: "center", marginTop: "10px" }}>
-          <button
-  onClick={generateFlashcards}
-  disabled={loading || (notes === lastGeneratedNotes && flashcards.length > 0)}
-            style={{
-              width: "50%",
-              padding: "12px",
-              borderRadius: "10px",
-              border: "none",
-              background: "#2563eb",
-              color: "white",
-              fontSize: "16px",
-              cursor: "pointer",
-            }}
-          >
-            {loading
-  ? "Generating..."
-  : notes === lastGeneratedNotes && flashcards.length > 0
-  ? "Already Generated"
-  : "Generate Flashcards"}
-          </button>
-
-          <button
-  onClick={handleGenerateChallenges}
-  style={{
-    width: "50%",
-    padding: "12px",
-    borderRadius: "10px",
-    border: "none",
-    background: "#16a34a",
-    color: "white",
-    fontSize: "16px",
-    cursor: "pointer",
-    marginTop: "10px",
-  }}
->
-  Generate Challenge Clips
-</button>
-        </div>
-
-        {loading && (
-          <div style={{ marginTop: "20px", textAlign: "center" }}>
-            <div className="spinner"></div>
-            <p style={{ marginTop: "10px", color: "#666" }}>
-              {loadingMessage}
-            </p>
-          </div>
-        )}
+        
+        
       </div>
 
       {/* FLASHCARD SECTION */}

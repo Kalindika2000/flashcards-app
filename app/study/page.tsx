@@ -56,7 +56,7 @@ const [showChallengeAnswer, setShowChallengeAnswer] = useState(false);
 } | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [flipped, setFlipped] = useState(false);
-  const [knownCards, setKnownCards] = useState<number[]>([]);
+  //const [knownCards, setKnownCards] = useState<number[]>([]);
   const [streak, setStreak] = useState(0);
   const [bestStreak, setBestStreak] = useState(0);
   const [isSessionComplete, setIsSessionComplete] = useState(false);
@@ -68,8 +68,9 @@ const activeCards =
   sessionCards.length > 0
     ? sessionCards
     : flashcards.map((_, i) => i);
-    const someKnown = knownCards.length > 0;
-const allMastered = knownCards.length === activeCards.length;
+    const knownCount = flashcards.filter((c) => c.known).length;
+const someKnown = knownCount > 0;
+const allMastered = knownCount === flashcards.length;
 const actualIndex = activeCards[currentIndex] ?? currentIndex;
 
   // ✅ LOAD ONLY CARDS FOR THIS NOTE
@@ -94,8 +95,8 @@ const actualIndex = activeCards[currentIndex] ?? currentIndex;
   const loadFlashcards = async () => {
   if (!noteId) return;
 
-  setLoading(true);
-  setLoadingMessage("Loading your flashcards...");
+  //setLoading(true);
+  //setLoadingMessage("Loading your flashcards...");
 
   const q = query(
     collection(db, "flashcards"),
@@ -104,10 +105,17 @@ const actualIndex = activeCards[currentIndex] ?? currentIndex;
 
   const snapshot = await getDocs(q);
 
-  const cards = snapshot.docs.map((doc) => ({
+  const cards: FlashcardType[] = snapshot.docs.map((doc) => {
+  const data = doc.data() as any;
+
+  return {
     id: doc.id,
-    ...(doc.data() as FlashcardType),
-  }));
+    question: data.question,
+    answer: data.answer,
+    noteId: data.noteId,
+    known: data.known ?? false,
+  };
+});
 
   setFlashcards(cards);
 /*setKnownCards(
@@ -241,12 +249,14 @@ useEffect(() => {
 }, [noteId]);
 
 const handleFlashcards = async () => {
+  setSessionCards([]); // ensures clean session
   setMode("flashcards");
 
-  await loadFlashcards(); // always reload to ensure fresh state
+  await loadFlashcards();
 };
 const resetMode = () => {
   setMode(null);
+  setSessionCards([]); // ✅ CRITICAL FIX
   setCurrentIndex(0);
   setFlipped(false);
   setIsSessionComplete(false);
@@ -266,9 +276,9 @@ const handleChallenge = async () => {
 
     setFlipped(false);
 
-    if (!knownCards.includes(actualIndex)) {
-      setStreak(0);
-    }
+    if (flashcards[actualIndex]?.known) {
+  setStreak(0);
+}
 
     setCurrentIndex((prev) => prev + 1);
   };
@@ -278,25 +288,9 @@ const handleChallenge = async () => {
     setCurrentIndex((prev) => (prev > 0 ? prev - 1 : prev));
   };
 
-  const markKnown = async () => {
-    const card = flashcards[actualIndex];
-    if (!card?.id) return;
+  
 
-    await updateDoc(doc(db, "flashcards", card.id), {
-      known: true,
-    });
-
-    setKnownCards((prev) =>
-  prev.includes(actualIndex) ? prev : [...prev, actualIndex]
-);
-
-    setStreak((prev) => {
-      const newStreak = prev + 1;
-      setBestStreak((best) => (newStreak > best ? newStreak : best));
-      return newStreak;
-    });
-  };
-/*
+    /*
   const restart = async () => {
     for (const card of flashcards) {
       if (!card.id) continue;
@@ -322,7 +316,7 @@ const restart = async () => {
   setLoadingMessage("Refreshing your cards...");
 
   // 🔁 ALWAYS FETCH FRESH DATA FROM DB
-  const q = query(
+ /* const q = query(
     collection(db, "flashcards"),
     where("noteId", "==", noteId)
   );
@@ -340,7 +334,8 @@ const restart = async () => {
     noteId: data.noteId,
     known: data.known ?? false,
   };
-});
+});*/
+const freshCards = flashcards;
 
   // ✅ update local state with fresh DB data
   setFlashcards(freshCards);
@@ -349,17 +344,10 @@ const restart = async () => {
 
   if (restartMode === "all") {
     // RESET DB FLAGS
-    for (const card of freshCards) {
-      if (!card.id) continue;
-
-      await updateDoc(doc(db, "flashcards", card.id), {
-        known: false,
-      });
-    }
-
+   
     newCards = freshCards.map((_, i) => i);
 
-    setKnownCards([]);
+    //setKnownCards([]);
   } else {
     // ✅ FILTER USING DB VALUE (NOT local state)
     newCards = freshCards
@@ -512,9 +500,16 @@ const currentCard = flashcards[actualIndex];
     )}
   </div>
 )}
-<h2 style={{ marginTop: "20px" }}>
+<div
+  style={{
+    marginTop: "20px",
+    marginBottom: "20px", // ✅ adds space below
+    fontWeight: "600",
+    cursor: "default",
+  }}
+>
   Choose how you want to study
-</h2>
+</div>
 
 {loading && (
   <div
@@ -725,13 +720,13 @@ const currentCard = flashcards[actualIndex];
         );
 
         // ✅ keep knownCards in sync (for now)
-        setKnownCards((prev) =>
+        /*setKnownCards((prev) =>
           newKnownState
             ? prev.includes(actualIndex)
               ? prev
               : [...prev, actualIndex]
             : prev.filter((i) => i !== actualIndex)
-        );
+        );*/
 
         // ✅ streak logic
         if (newKnownState) {
@@ -773,6 +768,9 @@ const currentCard = flashcards[actualIndex];
       {/* COMPLETE */}
       {mode === "flashcards" && isSessionComplete && flashcards.length > 0 && (
   <div style={{ marginTop: "40px", textAlign: "center" }}>
+    <button onClick={resetMode} style={{ marginBottom: "20px" }}>
+  ← Back to modes
+</button>
     <h2>🎉 Session Complete!</h2>
 
 {allMastered ? (
