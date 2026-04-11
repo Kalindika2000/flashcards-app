@@ -431,7 +431,15 @@ const currentCard = flashcards[actualIndex];
     <div style={{ width: "24px" }} />
   </div>
 </div>
-<div style={{ padding: "20px", paddingBottom: "80px" }}>
+<div
+  style={{
+    padding: "20px",
+    paddingBottom: "80px",
+    display: "flex",
+    flexDirection: "column",
+    //minHeight: "calc(100vh - 120px)",
+  }}
+>
       {note && (
   <div style={{ width: "100%", maxWidth: "900px", marginTop: "10px" }}>
     
@@ -756,9 +764,7 @@ const currentCard = flashcards[actualIndex];
           {/* STATS */}
           
 
-          <p>
-            Card {currentIndex + 1} / {activeCards.length}
-          </p>
+          
           {showFeedback && (
   <div
     style={{
@@ -773,36 +779,7 @@ const currentCard = flashcards[actualIndex];
       : "↺ Keep practicing"}
   </div>
 )}
-<div
-  style={{
-    marginTop: "20px",
-    display: "flex",
-    justifyContent: "center",
-    gap: "20px",
-    fontSize: "14px",
-    fontWeight: "500",
-  }}
->
-  <div
-    style={{
-      background: "#f3f4f6",
-      padding: "8px 12px",
-      borderRadius: "10px",
-    }}
-  >
-    🔥 Streak: <strong>{streak}</strong>
-  </div>
 
-  <div
-    style={{
-      background: "#f3f4f6",
-      padding: "8px 12px",
-      borderRadius: "10px",
-    }}
-  >
-    🏆 Best: <strong>{bestStreak}</strong>
-  </div>
-</div>
           {/* ACTION */}
           {flipped && (
   <div style={{ marginTop: "20px" }}>
@@ -887,12 +864,58 @@ const currentCard = flashcards[actualIndex];
 )}
 
           {/* NAV */}
-          <div style={{ marginTop: "30px", display: "flex", gap: "10px" }}>
-            <button onClick={goPrev}>Prev</button>
-            <button onClick={goNext}>
-              {currentIndex === activeCards.length - 1 ? "Finish" : "Next"}
-            </button>
-          </div>
+<div
+  style={{
+    marginTop: "70px",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: "12px",
+  }}
+>
+  {/* CARD PROGRESS */}
+  <div style={{ fontSize: "14px", fontWeight: "600", color: "#111" }}>
+    Card {currentIndex + 1} / {activeCards.length}
+  </div>
+
+  {/* STREAK */}
+  <div
+    style={{
+      display: "flex",
+      gap: "20px",
+      fontSize: "14px",
+      fontWeight: "500",
+    }}
+  >
+    <div
+      style={{
+        background: "#f3f4f6",
+        padding: "8px 12px",
+        borderRadius: "10px",
+      }}
+    >
+      🔥 Streak: <strong>{streak}</strong>
+    </div>
+
+    <div
+      style={{
+        background: "#f3f4f6",
+        padding: "8px 12px",
+        borderRadius: "10px",
+      }}
+    >
+      🏆 Best: <strong>{bestStreak}</strong>
+    </div>
+  </div>
+
+  {/* BUTTONS */}
+  <div style={{ display: "flex", gap: "10px" }}>
+    <button onClick={goPrev}>Prev</button>
+    <button onClick={goNext}>
+      {currentIndex === activeCards.length - 1 ? "Finish" : "Next"}
+    </button>
+  </div>
+</div>
         </>
       )}
 
