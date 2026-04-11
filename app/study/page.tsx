@@ -59,6 +59,7 @@ const [showChallengeAnswer, setShowChallengeAnswer] = useState(false);
   //const [knownCards, setKnownCards] = useState<number[]>([]);
   const [streak, setStreak] = useState(0);
   const [bestStreak, setBestStreak] = useState(0);
+  const [showFeedback, setShowFeedback] = useState<null | "known" | "unknown">(null);
   const [isSessionComplete, setIsSessionComplete] = useState(false);
 const [restartMode, setRestartMode] = useState<"all" | "difficult">("all");
 const [loading, setLoading] = useState(false);
@@ -656,57 +657,152 @@ const currentCard = flashcards[actualIndex];
       {mode === "flashcards" && flashcards.length > 0 && !isSessionComplete && (
         <>
           {/* CARD */}
-          <button onClick={resetMode}>
-          ← Back to modes
-        </button>
-         <div
-  onClick={() => setFlipped(!flipped)}
+          {/* CARD */}
+<div
   style={{
     width: "100%",
-    maxWidth: "500px",
-    height: "200px",
-    background: "#e5e5e5",
-    borderRadius: "16px",
     display: "flex",
-    alignItems: "center",
     justifyContent: "center",
-    padding: "20px",
-    textAlign: "center",
-    cursor: "pointer",
-    marginTop: "40px",
-    position: "relative",
+    marginTop: "20px",
   }}
 >
-  {currentCard?.known && (
-    <div
+  <div style={{ width: "100%", maxWidth: "500px" }}>
+    <button onClick={resetMode}>
+      ← Back to modes
+    </button>
+
+    <motion.div
+      onClick={() => setFlipped(!flipped)}
       style={{
-        position: "absolute",
-        top: "10px",
-        right: "10px",
-        fontSize: "12px",
-        background: "#22c55e",
-        color: "white",
-        padding: "4px 8px",
-        borderRadius: "6px",
+        width: "100%",
+        height: "200px",
+        perspective: "1000px",
+        marginTop: "20px",
+        cursor: "pointer",
+        position: "relative",
       }}
     >
-      Known
-    </div>
-  )}
-            <div style={{ fontSize: "18px", fontWeight: "600" }}>
-              {flipped ? currentCard?.answer : currentCard?.question}
-            </div>
+      <motion.div
+        animate={{ rotateY: flipped ? 180 : 0 }}
+        transition={{ duration: 0.5 }}
+        style={{
+          width: "100%",
+          height: "100%",
+          position: "relative",
+          transformStyle: "preserve-3d",
+        }}
+      >
+        <div
+          style={{
+            position: "absolute",
+            width: "100%",
+            height: "100%",
+            backfaceVisibility: "hidden",
+            background: "#e5e5e5",
+            borderRadius: "16px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "20px",
+            textAlign: "center",
+          }}
+        >
+          <div style={{ fontSize: "18px", fontWeight: "600" }}>
+            {currentCard?.question}
           </div>
+        </div>
 
+        <div
+          style={{
+            position: "absolute",
+            width: "100%",
+            height: "100%",
+            backfaceVisibility: "hidden",
+            transform: "rotateY(180deg)",
+            background: "#dbeafe",
+            borderRadius: "16px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "20px",
+            textAlign: "center",
+          }}
+        >
+          <div style={{ fontSize: "18px", fontWeight: "600" }}>
+            {currentCard?.answer}
+          </div>
+        </div>
+      </motion.div>
+
+      {currentCard?.known && (
+        <div
+          style={{
+            position: "absolute",
+            top: "10px",
+            right: "10px",
+            fontSize: "12px",
+            background: "#22c55e",
+            color: "white",
+            padding: "4px 8px",
+            borderRadius: "6px",
+          }}
+        >
+          Known
+        </div>
+      )}
+    </motion.div>
+  </div>
+</div>
           {/* STATS */}
-          <p style={{ marginTop: "20px" }}>
-            🔥 {streak} | 🏆 {bestStreak}
-          </p>
+          
 
           <p>
             Card {currentIndex + 1} / {activeCards.length}
           </p>
+          {showFeedback && (
+  <div
+    style={{
+      marginTop: "10px",
+      textAlign: "center",
+      fontWeight: "600",
+      color: showFeedback === "known" ? "#16a34a" : "#ef4444",
+    }}
+  >
+    {showFeedback === "known"
+      ? `🔥 Streak ${streak}`
+      : "↺ Keep practicing"}
+  </div>
+)}
+<div
+  style={{
+    marginTop: "20px",
+    display: "flex",
+    justifyContent: "center",
+    gap: "20px",
+    fontSize: "14px",
+    fontWeight: "500",
+  }}
+>
+  <div
+    style={{
+      background: "#f3f4f6",
+      padding: "8px 12px",
+      borderRadius: "10px",
+    }}
+  >
+    🔥 Streak: <strong>{streak}</strong>
+  </div>
 
+  <div
+    style={{
+      background: "#f3f4f6",
+      padding: "8px 12px",
+      borderRadius: "10px",
+    }}
+  >
+    🏆 Best: <strong>{bestStreak}</strong>
+  </div>
+</div>
           {/* ACTION */}
           {flipped && (
   <div style={{ marginTop: "20px" }}>
@@ -741,16 +837,40 @@ const currentCard = flashcards[actualIndex];
 
         // ✅ streak logic
         if (newKnownState) {
-          setStreak((prev) => {
-            const newStreak = prev + 1;
-            setBestStreak((best) =>
-              newStreak > best ? newStreak : best
-            );
-            return newStreak;
-          });
-        } else {
-          setStreak(0);
-        }
+  setStreak((prev) => {
+    const newStreak = prev + 1;
+    setBestStreak((best) =>
+      newStreak > best ? newStreak : best
+    );
+    return newStreak;
+  });
+
+  // ✅ trigger feedback
+  setShowFeedback("known");
+
+  setTimeout(() => {
+    setShowFeedback(null);
+  }, 1000);
+
+  // ✅ auto move to next card
+  setTimeout(() => {
+    goNext();
+  }, 300);
+} else {
+  setStreak(0);
+
+  // ✅ show feedback for difficult
+  setShowFeedback("unknown");
+
+  setTimeout(() => {
+    setShowFeedback(null);
+  }, 1000);
+
+  // ✅ auto move to next card
+  setTimeout(() => {
+    goNext();
+  }, 300);
+}
       }}
       style={{
         padding: "10px 16px",
