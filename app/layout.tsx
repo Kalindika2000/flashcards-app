@@ -1,7 +1,7 @@
 
 import type { Metadata } from "next";
 import "./globals.css";
-import BottomNav from "@/components/BottomNav";
+//import BottomNav from "@/components/BottomNav";
 
 export const metadata: Metadata = {
   title: "Create Next App",
@@ -26,7 +26,7 @@ export default function RootLayout({
     </html>
   );
 }
-function NavButton({ label }: { label: string }) {
+/*function NavButton({ label }: { label: string }) {
   return (
     <button
       style={{
@@ -65,4 +65,4 @@ function NavButton({ label }: { label: string }) {
       {label}
     </button>
   );
-}
+}*/

@@ -432,7 +432,7 @@ const currentCard = flashcards[actualIndex];
 </div>
 <div style={{ padding: "20px", paddingBottom: "80px" }}>
       {note && (
-  <div style={{ width: "100%", maxWidth: "500px", marginTop: "10px" }}>
+  <div style={{ width: "100%", maxWidth: "900px", marginTop: "10px" }}>
     
    <div
   style={{

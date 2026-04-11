@@ -8,29 +8,58 @@ export default function ModeSelection({
   onSelectChallenge: () => void;
 }) {
   return (
-    <div className="flex flex-col items-center justify-center h-full px-4 text-center">
-      
-      <div className="w-full max-w-md space-y-4">
-        <button
-          onClick={onSelectFlashcards}
-          className="w-full p-5 rounded-2xl shadow-md border bg-white active:scale-95 transition"
-        >
-          <div className="text-lg font-semibold">📚 Flashcards</div>
-          <div className="text-sm text-gray-500">
-            Review key ideas with swipe
-          </div>
-        </button>
+  <div
+    style={{
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: "20px",
+      textAlign: "center",
+    }}
+  >
+    <div
+      style={{
+        width: "100%",
+        maxWidth: "420px",
+        display: "flex",
+        justifyContent: "center",
+        gap: "16px",
+      }}
+    >
+      <button
+        onClick={onSelectFlashcards}
+        className="w-full p-5 rounded-2xl border transition"
+        style={{
+          backgroundColor: "#2563eb",
+          color: "white",
+        }}
+      >
+        <div style={{ fontSize: "18px", fontWeight: "600" }}>
+          📚 Flashcards
+        </div>
+        <div style={{ fontSize: "14px", opacity: 0.9 }}>
+          Review key ideas with swipe
+        </div>
+      </button>
 
-        <button
-          onClick={onSelectChallenge}
-          className="w-full p-5 rounded-2xl shadow-md border bg-white active:scale-95 transition"
-        >
-          <div className="text-lg font-semibold">⚡ Challenge Mode</div>
-          <div className="text-sm text-gray-500">
-            Test yourself under pressure
-          </div>
-        </button>
-      </div>
+      <button
+        onClick={onSelectChallenge}
+        className="w-full p-5 rounded-2xl border transition"
+        style={{
+          backgroundColor: "#10b981",
+          color: "white",
+          boxShadow: "0 8px 20px rgba(16, 185, 129, 0.25)",
+        }}
+      >
+        <div style={{ fontSize: "18px", fontWeight: "600" }}>
+          ⚡ Challenge Mode
+        </div>
+        <div style={{ fontSize: "14px", opacity: 0.9 }}>
+          Test yourself under pressure
+        </div>
+      </button>
     </div>
-  );
+  </div>
+);
 }
