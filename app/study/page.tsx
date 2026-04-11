@@ -672,6 +672,7 @@ const currentCard = flashcards[actualIndex];
     display: "flex",
     justifyContent: "center",
     marginTop: "20px",
+    marginBottom: "50px",
   }}
 >
   <div style={{ width: "100%", maxWidth: "500px" }}>
@@ -782,83 +783,70 @@ const currentCard = flashcards[actualIndex];
 
           {/* ACTION */}
           {flipped && (
-  <div style={{ marginTop: "20px" }}>
+  <div
+    style={{
+      marginTop: "20px",
+      display: "flex",
+      justifyContent: "center",
+    }}
+  >
     <button
-      onClick={async (e) => {
-        e.stopPropagation();
+      onClick={() => {
+        const newKnownState = !currentCard?.known;
 
-        const card = flashcards[actualIndex];
-        if (!card?.id) return;
-
-        const newKnownState = !card.known;
-
-        await updateDoc(doc(db, "flashcards", card.id), {
-          known: newKnownState,
-        });
-
-        // ✅ update local flashcards state (critical)
         setFlashcards((prev) =>
-          prev.map((c, i) =>
-            i === actualIndex ? { ...c, known: newKnownState } : c
+          prev.map((card, idx) =>
+            idx === actualIndex
+              ? { ...card, known: newKnownState }
+              : card
           )
         );
 
-        // ✅ keep knownCards in sync (for now)
-        /*setKnownCards((prev) =>
-          newKnownState
-            ? prev.includes(actualIndex)
-              ? prev
-              : [...prev, actualIndex]
-            : prev.filter((i) => i !== actualIndex)
-        );*/
-
-        // ✅ streak logic
         if (newKnownState) {
-  setStreak((prev) => {
-    const newStreak = prev + 1;
-    setBestStreak((best) =>
-      newStreak > best ? newStreak : best
-    );
-    return newStreak;
-  });
+          setStreak((prev) => {
+            const newStreak = prev + 1;
+            setBestStreak((best) =>
+              newStreak > best ? newStreak : best
+            );
+            return newStreak;
+          });
 
-  // ✅ trigger feedback
-  setShowFeedback("known");
+          setShowFeedback("known");
 
-  setTimeout(() => {
-    setShowFeedback(null);
-  }, 1000);
+          setTimeout(() => {
+            setShowFeedback(null);
+          }, 1000);
 
-  // ✅ auto move to next card
-  setTimeout(() => {
-    goNext();
-  }, 300);
-} else {
-  setStreak(0);
+          setTimeout(() => {
+            goNext();
+          }, 300);
+        } else {
+          setStreak(0);
 
-  // ✅ show feedback for difficult
-  setShowFeedback("unknown");
+          setShowFeedback("unknown");
 
-  setTimeout(() => {
-    setShowFeedback(null);
-  }, 1000);
+          setTimeout(() => {
+            setShowFeedback(null);
+          }, 1000);
 
-  // ✅ auto move to next card
-  setTimeout(() => {
-    goNext();
-  }, 300);
-}
+          setTimeout(() => {
+            goNext();
+          }, 300);
+        }
       }}
       style={{
-        padding: "10px 16px",
-        borderRadius: "8px",
+        padding: "12px 18px",
+        borderRadius: "10px",
         border: "none",
         background: currentCard?.known ? "#ef4444" : "#22c55e",
         color: "white",
         cursor: "pointer",
+        width: "90%",
+        maxWidth: "320px",
+        textAlign: "center",
       }}
     >
-      {currentCard?.known ? "❌ Mark as difficult" : "✅ I know this"}
+      {currentCard?.known ? "✕ Mark as difficult" : "✓ I know this"}
     </button>
   </div>
 )}
