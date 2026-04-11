@@ -23,18 +23,33 @@ export default function ModeSelection({
         width: "100%",
         maxWidth: "420px",
         display: "flex",
-        justifyContent: "center",
-        gap: "16px",
+      flexDirection: "column",
+      gap: "16px",
+      
       }}
     >
       <button
-        onClick={onSelectFlashcards}
-        className="w-full p-5 rounded-2xl border transition"
-        style={{
-          backgroundColor: "#2563eb",
-          color: "white",
-        }}
-      >
+  onClick={onSelectFlashcards}
+ /* onMouseEnter={(e) => {
+  e.currentTarget.style.transform = "translateY(-2px) scale(1)";
+}}
+onMouseLeave={(e) => {
+  e.currentTarget.style.transform = "translateY(0) scale(1)";
+}}
+onMouseDown={(e) => {
+  e.currentTarget.style.transform = "translateY(0) scale(0.96)";
+}}
+onMouseUp={(e) => {
+  e.currentTarget.style.transform = "translateY(-2px) scale(1)";
+}}*/
+  //className="w-full p-5 rounded-2xl border"
+  className="mode-button w-full p-5 rounded-2xl border"
+  style={{
+    backgroundColor: "#2563eb",
+    color: "white",
+    //transition: "transform 0.15s ease",
+  }}
+>
         <div style={{ fontSize: "18px", fontWeight: "600" }}>
           📚 Flashcards
         </div>
@@ -44,14 +59,28 @@ export default function ModeSelection({
       </button>
 
       <button
-        onClick={onSelectChallenge}
-        className="w-full p-5 rounded-2xl border transition"
-        style={{
-          backgroundColor: "#10b981",
-          color: "white",
-          boxShadow: "0 8px 20px rgba(16, 185, 129, 0.25)",
-        }}
-      >
+  onClick={onSelectChallenge}
+  /*onMouseEnter={(e) => {
+  e.currentTarget.style.transform = "translateY(-2px) scale(1)";
+}}
+onMouseLeave={(e) => {
+  e.currentTarget.style.transform = "translateY(0) scale(1)";
+}}
+onMouseDown={(e) => {
+  e.currentTarget.style.transform = "translateY(0) scale(0.96)";
+}}
+onMouseUp={(e) => {
+  e.currentTarget.style.transform = "translateY(-2px) scale(1)";
+}}*/
+  //className="w-full p-5 rounded-2xl border"
+  className="mode-button w-full p-5 rounded-2xl border"
+  style={{
+    backgroundColor: "#10b981",
+    color: "white",
+    boxShadow: "0 8px 20px rgba(16, 185, 129, 0.25)",
+    //transition: "transform 0.15s ease",
+  }}
+>
         <div style={{ fontSize: "18px", fontWeight: "600" }}>
           ⚡ Challenge Mode
         </div>

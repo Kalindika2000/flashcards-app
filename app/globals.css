@@ -244,3 +244,27 @@ body {
   border: 2px solid #3b82f6;
   transform: scale(0.98);
 }
+/*.mode-button {
+  transition: transform 0.12s ease-out, box-shadow 0.12s ease-out;
+}
+
+.mode-button:hover {
+  transform: translateY(-3px);
+}
+
+.mode-button:active {
+  transform: scale(0.96);
+}*/
+
+.mode-button {
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  cursor: pointer;
+}
+
+.mode-button:hover {
+  transform: translateY(-4px) !important;
+}
+
+.mode-button:active {
+  transform: scale(0.96) !important;
+}

@@ -534,10 +534,21 @@ const currentCard = flashcards[actualIndex];
   </div>
 )}
 {mode === null && (
-  <ModeSelection
-    onSelectFlashcards={handleFlashcards}
-    onSelectChallenge={handleChallenge}
-  />
+  <div
+    style={{
+  background: "#ffffff",
+  borderRadius: "16px",
+  padding: "24px",
+  boxShadow: "0 12px 32px rgba(0,0,0,0.08)",
+  border: "1px solid #e5e7eb",
+  marginTop: "10px",
+}}
+  >
+    <ModeSelection
+      onSelectFlashcards={handleFlashcards}
+      onSelectChallenge={handleChallenge}
+    />
+  </div>
 )}
 
       {flashcards.length === 0 && mode === "flashcards" && (
