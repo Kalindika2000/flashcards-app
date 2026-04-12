@@ -437,7 +437,7 @@ const currentCard = flashcards[actualIndex];
     paddingBottom: "80px",
     display: "flex",
     flexDirection: "column",
-    //minHeight: "calc(100vh - 120px)",
+    boxSizing: "border-box", // ✅ THIS FIXES MOBILE SHIFT
   }}
 >
       {note && (
@@ -669,19 +669,22 @@ const currentCard = flashcards[actualIndex];
 <div
   style={{
     width: "100%",
-    display: "flex",
-    justifyContent: "center",
+    //display: "flex",
+   // justifyContent: "center",
     marginTop: "20px",
     marginBottom: "50px",
+    
   }}
 >
-  <div style={{ width: "100%", maxWidth: "500px" }}>
+  <div style={{ width: "100%",   margin: "0 auto",  }}>
     <button onClick={resetMode}>
       ← Back to modes
     </button>
 
-    <motion.div
+   {/*<motion.div
       onClick={() => setFlipped(!flipped)}
+      //animate={{ rotateY: flipped ? 180 : 0 }}
+      //transition={{ duration: 0.5 }}
       style={{
         width: "100%",
         height: "200px",
@@ -689,6 +692,9 @@ const currentCard = flashcards[actualIndex];
         marginTop: "20px",
         cursor: "pointer",
         position: "relative",
+        //padding: "20px",
+       // marginLeft: "40px",
+        // marginRight: "80px"
       }}
     >
       <motion.div
@@ -699,6 +705,9 @@ const currentCard = flashcards[actualIndex];
           height: "100%",
           position: "relative",
           transformStyle: "preserve-3d",
+          //marginRight: "80px",
+          //marginLeft: "40px",
+          //transformOrigin: "center center",
         }}
       >
         <div
@@ -707,6 +716,7 @@ const currentCard = flashcards[actualIndex];
             width: "100%",
             height: "100%",
             backfaceVisibility: "hidden",
+            //WebkitBackfaceVisibility: "hidden", 
             background: "#e5e5e5",
             borderRadius: "16px",
             display: "flex",
@@ -714,6 +724,8 @@ const currentCard = flashcards[actualIndex];
             justifyContent: "center",
             padding: "20px",
             textAlign: "center",
+            //marginRight: "80px",
+            
           }}
         >
           <div style={{ fontSize: "18px", fontWeight: "600" }}>
@@ -727,6 +739,7 @@ const currentCard = flashcards[actualIndex];
             width: "100%",
             height: "100%",
             backfaceVisibility: "hidden",
+            //WebkitBackfaceVisibility: "hidden",
             transform: "rotateY(180deg)",
             background: "#dbeafe",
             borderRadius: "16px",
@@ -735,9 +748,10 @@ const currentCard = flashcards[actualIndex];
             justifyContent: "center",
             padding: "20px",
             textAlign: "center",
+            //marginRight: "80px",
           }}
         >
-          <div style={{ fontSize: "18px", fontWeight: "600" }}>
+          <div style={{ fontSize: "18px", fontWeight: "600", }}>
             {currentCard?.answer}
           </div>
         </div>
@@ -754,12 +768,96 @@ const currentCard = flashcards[actualIndex];
             color: "white",
             padding: "4px 8px",
             borderRadius: "6px",
+            
           }}
         >
           Known
         </div>
       )}
-    </motion.div>
+    </motion.div> */}
+
+<motion.div
+  onClick={() => setFlipped(!flipped)}
+  style={{
+    width: "90%",
+    height: "200px",
+    marginTop: "20px",
+    cursor: "pointer",
+    position: "relative",
+    
+  }}
+>
+  {/* FRONT */}
+  <motion.div
+    animate={{
+      rotateY: flipped ? 180 : 0,
+      opacity: flipped ? 0 : 1,
+    }}
+    transition={{ duration: 0.4 }}
+    style={{
+      position: "absolute",
+      width: "100%",
+      height: "100%",
+      background: "#e5e5e5",
+      borderRadius: "16px",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: "20px",
+      textAlign: "center",
+      backfaceVisibility: "hidden",
+      
+    }}
+  >
+    <div style={{ fontSize: "18px", fontWeight: "600" ,}}>
+      {currentCard?.question}
+    </div>
+  </motion.div>
+
+  {/* BACK */}
+  <motion.div
+    animate={{
+      rotateY: flipped ? 0 : -180,
+      opacity: flipped ? 1 : 0,
+    }}
+    transition={{ duration: 0.4 }}
+    style={{
+      position: "absolute",
+      width: "100%",
+      height: "100%",
+      background: "#dbeafe",
+      borderRadius: "16px",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: "20px",
+      textAlign: "center",
+      backfaceVisibility: "hidden",
+    }}
+  >
+    <div style={{ fontSize: "18px", fontWeight: "600" }}>
+      {currentCard?.answer}
+    </div>
+  </motion.div>
+  {currentCard?.known && (
+  <div
+    style={{
+      position: "absolute",
+      top: "10px",
+      right: "10px",
+      fontSize: "12px",
+      background: "#22c55e",
+      color: "white",
+      padding: "4px 8px",
+      borderRadius: "6px",
+      zIndex: 10,
+    }}
+  >
+    Known
+  </div>
+)}
+</motion.div>
+
   </div>
 </div>
           {/* STATS */}
