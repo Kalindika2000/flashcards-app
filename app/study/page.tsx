@@ -918,48 +918,63 @@ const currentCard = flashcards[actualIndex];
   >
     <button
       onClick={() => {
-        const newKnownState = !currentCard?.known;
+        
+  const newKnownState = !currentCard?.known;
 
-        setFlashcards((prev) =>
-          prev.map((card, idx) =>
-            idx === actualIndex
-              ? { ...card, known: newKnownState }
-              : card
-          )
-        );
+  if (newKnownState) {
+    setStreak((prev) => {
+      const newStreak = prev + 1;
+      setBestStreak((best) =>
+        newStreak > best ? newStreak : best
+      );
+      return newStreak;
+    });
 
-        if (newKnownState) {
-          setStreak((prev) => {
-            const newStreak = prev + 1;
-            setBestStreak((best) =>
-              newStreak > best ? newStreak : best
-            );
-            return newStreak;
-          });
+    setShowFeedback("known");
 
-          setShowFeedback("known");
+    setTimeout(() => {
+      setShowFeedback(null);
+    }, 1000);
 
-          setTimeout(() => {
-            setShowFeedback(null);
-          }, 1000);
+    setTimeout(() => {
+      // ✅ MOVE STATE UPDATE HERE
+      setFlashcards((prev) =>
+        prev.map((card, idx) =>
+          idx === actualIndex
+            ? { ...card, known: newKnownState }
+            : card
+        )
+      );
 
-          setTimeout(() => {
-            goNext();
-          }, 300);
-        } else {
-          setStreak(0);
+      goNext();
+    }, 300);
 
-          setShowFeedback("unknown");
+  } else {
+    setStreak(0);
 
-          setTimeout(() => {
-            setShowFeedback(null);
-          }, 1000);
+    setShowFeedback("unknown");
 
-          setTimeout(() => {
-            goNext();
-          }, 300);
-        }
-      }}
+    setTimeout(() => {
+      setShowFeedback(null);
+    }, 1000);
+
+    setTimeout(() => {
+      // ✅ MOVE STATE UPDATE HERE
+      setFlashcards((prev) =>
+        prev.map((card, idx) =>
+          idx === actualIndex
+            ? { ...card, known: newKnownState }
+            : card
+        )
+      );
+
+      goNext();
+    }, 300);
+  }
+}}
+     
+     //</div> }}
+        
       style={{
         padding: "12px 18px",
         borderRadius: "10px",
