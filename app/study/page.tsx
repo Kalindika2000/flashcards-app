@@ -803,9 +803,11 @@ const currentCard = flashcards[actualIndex];
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
-      padding: "20px",
+     // padding: "20px",
+      padding: "40px 20px 20px 20px",
       textAlign: "center",
       backfaceVisibility: "hidden",
+      overflowY: "auto",
       
     }}
   >
@@ -830,16 +832,18 @@ const currentCard = flashcards[actualIndex];
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
-      padding: "20px",
+      //padding: "20px",
+      padding: "40px 20px 20px 20px",
       textAlign: "center",
       backfaceVisibility: "hidden",
+      overflowY: "auto",
     }}
   >
     <div style={{ fontSize: "18px", fontWeight: "600" }}>
       {currentCard?.answer}
     </div>
   </motion.div>
-  {currentCard?.known && (
+  {/*{currentCard?.known && (
   <div
     style={{
       position: "absolute",
@@ -853,7 +857,31 @@ const currentCard = flashcards[actualIndex];
       zIndex: 10,
     }}
   >
-    Known
+     ✓
+    //Known
+  </div>
+)}*/}
+
+{currentCard?.known && (
+  <div
+    style={{
+      position: "absolute",
+      top: "5px",
+      right: "-30px",
+      width: "24px",
+      height: "24px",
+      borderRadius: "50%",
+      background: "#22c55e",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      color: "white",
+      fontSize: "14px",
+      fontWeight: "bold",
+      zIndex: 10,
+    }}
+  >
+    ✓
   </div>
 )}
 </motion.div>
