@@ -434,7 +434,8 @@ const currentCard = flashcards[actualIndex];
 <div
   style={{
     padding: "20px",
-    paddingBottom: "80px",
+   // paddingBottom: "80px",
+   paddingBottom: "calc(80px + env(safe-area-inset-bottom))",
     display: "flex",
     flexDirection: "column",
     boxSizing: "border-box", // ✅ THIS FIXES MOBILE SHIFT
