@@ -627,12 +627,16 @@ const handleMarkCard = async () => {
   <motion.div
   key={challengeIndex}
   style={{
-    maxWidth: "500px",
-    width: "100%",
+   maxWidth: "440px",
+width: "calc(100% - 40px)",
+marginLeft: "auto",
+marginRight: "auto",
     marginTop: "20px",
     border: "2px solid #16a34a",
     borderRadius: "12px",
     padding: "20px",
+    background: "#ffffff",
+    boxShadow: "0 10px 25px rgba(0, 0, 0, 0.08)",
     touchAction: "none",
   }}
   drag="y"
