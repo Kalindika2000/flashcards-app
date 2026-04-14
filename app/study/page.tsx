@@ -520,11 +520,18 @@ const handleMarkCard = async () => {
     Choose how you want to study
   </div>
 ) : (
+  <div
+  style={{
+    marginTop: "20px",
+    marginBottom: "20px",
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+  }}
+>
   <button
     onClick={resetMode}
     style={{
-      marginTop: "20px",
-      marginBottom: "20px",
       background: "none",
       border: "none",
       color: "#2563eb",
@@ -535,6 +542,19 @@ const handleMarkCard = async () => {
   >
     ← Back to study modes
   </button>
+
+  {mode === "challenge" && challenges.length > 0 && (
+    <div
+      style={{
+        fontSize: "14px",
+        fontWeight: "600",
+        color: "#6b7280",
+      }}
+    >
+      Challenge Mode
+    </div>
+  )}
+</div>
 )}
 {loading && (
   <div
@@ -602,7 +622,8 @@ const handleMarkCard = async () => {
 )}
       {mode === "challenge" && challenges.length > 0 && (
          <>
-    <h3 style={{ marginTop: "20px" }}>Challenge Mode</h3>
+   
+
   <motion.div
   key={challengeIndex}
   style={{
@@ -615,9 +636,9 @@ const handleMarkCard = async () => {
     touchAction: "none",
   }}
   drag="y"
-  dragElastic={0.2}
-  dragMomentum={true}
-  dragConstraints={{ top: 0, bottom: 0 }}
+  dragElastic={0.1}
+  dragMomentum={false}
+  dragConstraints={{ top: -10, bottom: 80 }}
   onDragEnd={handleSwipeEnd}
   initial={{ y: 300, opacity: 0 }}
   animate={{ y: 0, opacity: 1 }}
