@@ -635,66 +635,7 @@ const handleMarkCard = async () => {
         {challenges[challengeIndex]?.question}
       </p>
 
-     {/*} {!showChallengeAnswer ? (
-        <>
-        <div
-  style={{
-    marginTop: "20px",
-    padding: "14px",
-    background: "#eef2ff",
-    borderRadius: "10px",
-    border: "1px solid #c7d2fe",
-    textAlign: "center",
-  }}
->
-  <div
-    style={{
-      fontSize: "12px",
-      fontWeight: "600",
-      color: "#4f46e5",
-      marginBottom: "6px",
-      letterSpacing: "0.5px",
-    }}
-  >
-    ANSWER
-  </div>
-
-
-  <div style={{ fontWeight: "600", fontSize: "16px" }}>
-    {challenges[challengeIndex]?.answer}
-  </div>
-</div>
-
-
-
-      <div style={{ marginTop: "20px" }}>
-        <button
-          onClick={() => {
-            if (challengeIndex > 0) {
-              setChallengeIndex(challengeIndex - 1);
-              setShowChallengeAnswer(false);
-            }
-          }}
-          style={{ marginRight: "10px" }}
-        >
-          ⬅ Prev
-        </button>
-
-        <button
-          onClick={() => {
-            if (challengeIndex < challenges.length - 1) {
-              setChallengeIndex(challengeIndex + 1);
-              setShowChallengeAnswer(false);
-            }
-          }}
-        >
-          Next ➡
-        </button>
-                  </div>
-     </>
-) : null}*/}
-
-
+     
 {!showChallengeAnswer ? (
   <div style={{ marginTop: "20px" }}>
     <button
@@ -713,7 +654,10 @@ const handleMarkCard = async () => {
   </div>
 ) : (
   <>
-    <div
+    <motion.div
+  initial={{ opacity: 0, y: 10 }}
+  animate={{ opacity: 1, y: 0 }}
+  transition={{ duration: 0.3 }}
       style={{
         marginTop: "20px",
         padding: "14px",
@@ -738,18 +682,21 @@ const handleMarkCard = async () => {
       <div style={{ fontWeight: "600", fontSize: "16px" }}>
         {challenges[challengeIndex]?.answer}
       </div>
-    </div>
+    </motion.div>
 
-    <div
-      style={{
-        marginTop: "16px",
-        fontSize: "14px",
-        color: "#555",
-        textAlign: "center",
-      }}
-    >
+    <motion.div
+  initial={{ opacity: 0, y: 10 }}
+  animate={{ opacity: 1, y: 0 }}
+  transition={{ duration: 0.4, delay: 0.15 }}
+  style={{
+    marginTop: "16px",
+    fontSize: "14px",
+    color: "#555",
+    textAlign: "center",
+  }}
+>
       {challenges[challengeIndex]?.explanation}
-    </div>
+    </motion.div>
 
     <div style={{ marginTop: "20px" }}>
       <button
