@@ -28,6 +28,7 @@ import {
   query,
   where,
   addDoc,
+  deleteDoc, 
 } from "firebase/firestore";
 
 type FlashcardType = {
@@ -36,6 +37,7 @@ type FlashcardType = {
   answer: string;
   noteId?: string;
   known?: boolean;
+  noteVersion?: number;
 };
 
 //export default function StudyPage() {
@@ -53,6 +55,7 @@ const [showChallengeAnswer, setShowChallengeAnswer] = useState(false);
   const [note, setNote] = useState<{
   title: string;
   content: string;
+  version?: number;
 } | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [flipped, setFlipped] = useState(false);
@@ -73,6 +76,15 @@ const activeCards =
 const someKnown = knownCount > 0;
 const allMastered = knownCount === flashcards.length;
 const actualIndex = activeCards[currentIndex] ?? currentIndex;
+
+const isOutdated =
+  flashcards.length > 0 &&
+  note?.version !== undefined &&
+  flashcards.some(
+    (card) =>
+      (card as any).noteVersion !== (note.version ?? 1)
+  );
+  
 
   // ✅ LOAD ONLY CARDS FOR THIS NOTE
  /* const loadFlashcards = async () => {
@@ -115,6 +127,7 @@ const actualIndex = activeCards[currentIndex] ?? currentIndex;
     answer: data.answer,
     noteId: data.noteId,
     known: data.known ?? false,
+    noteVersion: data.noteVersion ?? 1,
   };
 });
 
@@ -175,18 +188,31 @@ setLoadingMessage("Generating flashcards...");
       return;
     }
     setLoadingMessage("Saving your flashcards...");   
+    // 🔥 DELETE old flashcards first
+    const q = query(
+      collection(db, "flashcards"),
+      where("noteId", "==", noteId)
+    );
+
+    const snapshot = await getDocs(q);
+
+    for (const docSnap of snapshot.docs) {
+      await deleteDoc(doc(db, "flashcards", docSnap.id));
+    }
     for (const card of data.flashcards) {
+      
       await addDoc(collection(db, "flashcards"), {
         question: card.question,
         answer: card.answer,
         noteId: noteId,
         createdAt: new Date(),
+        noteVersion: note?.version ?? 1,
         known: false,
       });
     }
 
     await loadFlashcards();
-    //setLoading(false);
+    setIsSessionComplete(false);
     setMode("flashcards");
 
   } catch (err) {
@@ -291,23 +317,7 @@ const handleChallenge = async () => {
 
   
 
-    /*
-  const restart = async () => {
-    for (const card of flashcards) {
-      if (!card.id) continue;
-
-      await updateDoc(doc(db, "flashcards", card.id), {
-        known: false,
-      });
-    }
-
-  
-    setKnownCards([]);
-    setCurrentIndex(0);
-    setFlipped(false);
-    setStreak(0);
-    setIsSessionComplete(false);
-  };*/
+    
 
 
 const restart = async () => {
@@ -317,25 +327,7 @@ const restart = async () => {
   setLoadingMessage("Refreshing your cards...");
 
   // 🔁 ALWAYS FETCH FRESH DATA FROM DB
- /* const q = query(
-    collection(db, "flashcards"),
-    where("noteId", "==", noteId)
-  );
 
-  const snapshot = await getDocs(q);
-
-  //const freshCards = snapshot.docs.map((doc) => {
-    const freshCards: FlashcardType[] = snapshot.docs.map((doc) => {
-  const data = doc.data() as any;
-
-  return {
-    id: doc.id,
-    question: data.question,
-    answer: data.answer,
-    noteId: data.noteId,
-    known: data.known ?? false,
-  };
-});*/
 const freshCards = flashcards;
 
   // ✅ update local state with fresh DB data
@@ -366,40 +358,7 @@ const freshCards = flashcards;
 };
 
 
- /* const restart = async () => {
-  const newCards =
-    restartMode === "all"
-      ? flashcards.map((_, i) => i)
-      : flashcards
-          .map((_, i) => i)
-          .filter((i) => !knownCards.includes(i));
-
-          const newCards =
-  restartMode === "all"
-    ? flashcards.map((_, i) => i)
-    : flashcards
-        .map((card, i) => (card.known ? -1 : i))
-        .filter((i) => i !== -1);
-
-  setSessionCards(newCards);
-
-  if (restartMode === "all") {
-    for (const card of flashcards) {
-      if (!card.id) continue;
-
-      await updateDoc(doc(db, "flashcards", card.id), {
-        known: false,
-      });
-    }
-
-    setKnownCards([]);
-  }
-
-  setCurrentIndex(0);
-  setFlipped(false);
-  setStreak(0);
-  setIsSessionComplete(false);
-};*/
+ 
 
   //const currentCard = flashcards[currentIndex];
 const currentCard = flashcards[actualIndex];
@@ -412,14 +371,7 @@ const handleMarkCard = async () => {
       known: newKnownState,
     });
   }
-/*
-  setFlashcards((prev) =>
-    prev.map((c, idx) =>
-      idx === actualIndex
-        ? { ...c, known: newKnownState }
-        : c
-    )
-  );*/
+
 
   if (newKnownState) {
     setStreak((prev) => {
@@ -435,17 +387,9 @@ const handleMarkCard = async () => {
     setShowFeedback("unknown");
   }
 
- /* setTimeout(() => setShowFeedback(null), 1000);
-  setFlashcards((prev) =>
-    prev.map((c, idx) =>
-      idx === actualIndex
-        ? { ...c, known: newKnownState }
-        : c
-    )
-  );*/
+ 
 
-  //setTimeout(goNext, 300);
-  setTimeout(() => {
+    setTimeout(() => {
   setFlashcards((prev) =>
     prev.map((c, idx) =>
       idx === actualIndex
@@ -563,17 +507,35 @@ const handleMarkCard = async () => {
     )}
   </div>
 )}
-<div
-  style={{
-    marginTop: "20px",
-    marginBottom: "20px", // ✅ adds space below
-    fontWeight: "600",
-    cursor: "default",
-  }}
->
-  Choose how you want to study
-</div>
 
+
+{mode === null ? (
+  <div
+    style={{
+      marginTop: "20px",
+      marginBottom: "20px",
+      fontWeight: "600",
+    }}
+  >
+    Choose how you want to study
+  </div>
+) : (
+  <button
+    onClick={resetMode}
+    style={{
+      marginTop: "20px",
+      marginBottom: "20px",
+      background: "none",
+      border: "none",
+      color: "#2563eb",
+      fontWeight: "600",
+      cursor: "pointer",
+      textAlign: "left",
+    }}
+  >
+    ← Back to study modes
+  </button>
+)}
 {loading && (
   <div
     style={{
@@ -614,9 +576,13 @@ const handleMarkCard = async () => {
   </div>
 )}
 
-      {flashcards.length === 0 && mode === "flashcards" && (
+      {(flashcards.length === 0 || isOutdated) && mode === "flashcards" && (
   <div style={{ marginTop: "20px", textAlign: "center" }}>
-    <p>No cards found.</p>
+    <p>
+  {isOutdated
+    ? "⚠️ Flashcards are outdated. Please regenerate them."
+    : "No cards found."}
+</p>
 
     <button
       onClick={handleGenerateFlashcards}
@@ -636,10 +602,7 @@ const handleMarkCard = async () => {
 )}
       {mode === "challenge" && challenges.length > 0 && (
          <>
-    <button onClick={resetMode}>
-      ← Back to modes
-    </button>
-
+    
   <motion.div
   key={challengeIndex}
   style={{
@@ -672,21 +635,37 @@ const handleMarkCard = async () => {
         {challenges[challengeIndex]?.question}
       </p>
 
-      {!showChallengeAnswer ? (
-        <button
-          onClick={() => setShowChallengeAnswer(true)}
-          style={{ marginTop: "15px" }}
-        >
-          Reveal Answer
-        </button>
-      ) : (
+     {/*} {!showChallengeAnswer ? (
         <>
-          <p style={{ marginTop: "15px", fontWeight: "bold" }}>
-            Answer: {challenges[challengeIndex]?.answer}
-          </p>
-          <p>{challenges[challengeIndex]?.explanation}</p>
-        </>
-      )}
+        <div
+  style={{
+    marginTop: "20px",
+    padding: "14px",
+    background: "#eef2ff",
+    borderRadius: "10px",
+    border: "1px solid #c7d2fe",
+    textAlign: "center",
+  }}
+>
+  <div
+    style={{
+      fontSize: "12px",
+      fontWeight: "600",
+      color: "#4f46e5",
+      marginBottom: "6px",
+      letterSpacing: "0.5px",
+    }}
+  >
+    ANSWER
+  </div>
+
+
+  <div style={{ fontWeight: "600", fontSize: "16px" }}>
+    {challenges[challengeIndex]?.answer}
+  </div>
+</div>
+
+
 
       <div style={{ marginTop: "20px" }}>
         <button
@@ -712,12 +691,105 @@ const handleMarkCard = async () => {
           Next ➡
         </button>
                   </div>
+     </>
+) : null}*/}
+
+
+{!showChallengeAnswer ? (
+  <div style={{ marginTop: "20px" }}>
+    <button
+      onClick={() => setShowChallengeAnswer(true)}
+      style={{
+        padding: "10px 16px",
+        borderRadius: "8px",
+        border: "none",
+        background: "#2563eb",
+        color: "white",
+        cursor: "pointer",
+      }}
+    >
+      Reveal Answer
+    </button>
+  </div>
+) : (
+  <>
+    <div
+      style={{
+        marginTop: "20px",
+        padding: "14px",
+        background: "#eef2ff",
+        borderRadius: "10px",
+        border: "1px solid #c7d2fe",
+        textAlign: "center",
+      }}
+    >
+      <div
+        style={{
+          fontSize: "12px",
+          fontWeight: "600",
+          color: "#4f46e5",
+          marginBottom: "6px",
+          letterSpacing: "0.5px",
+        }}
+      >
+        ANSWER
+      </div>
+
+      <div style={{ fontWeight: "600", fontSize: "16px" }}>
+        {challenges[challengeIndex]?.answer}
+      </div>
     </div>
+
+    <div
+      style={{
+        marginTop: "16px",
+        fontSize: "14px",
+        color: "#555",
+        textAlign: "center",
+      }}
+    >
+      {challenges[challengeIndex]?.explanation}
+    </div>
+
+    <div style={{ marginTop: "20px" }}>
+      <button
+        onClick={() => {
+          if (challengeIndex > 0) {
+            setChallengeIndex(challengeIndex - 1);
+            setShowChallengeAnswer(false);
+          }
+        }}
+        style={{ marginRight: "10px" }}
+      >
+        ⬅ Prev
+      </button>
+
+      <button
+        onClick={() => {
+          if (challengeIndex < challenges.length - 1) {
+            setChallengeIndex(challengeIndex + 1);
+            setShowChallengeAnswer(false);
+          }
+        }}
+      >
+        Next ➡
+      </button>
+    </div>
+  </>
+)}
+
+
+
+</div>
   </motion.div>
 </>
 )}
-      {mode === "flashcards" && flashcards.length > 0 && !isSessionComplete && (
+
+
+        {mode === "flashcards" && flashcards.length > 0 && !isSessionComplete && !isOutdated && (
         <>
+        
+        
           {/* CARD */}
           {/* CARD */}
 <div
@@ -731,104 +803,7 @@ const handleMarkCard = async () => {
   }}
 >
   <div style={{ width: "100%",   margin: "0 auto",  }}>
-    <button onClick={resetMode}>
-      ← Back to modes
-    </button>
-
-   {/*<motion.div
-      onClick={() => setFlipped(!flipped)}
-      //animate={{ rotateY: flipped ? 180 : 0 }}
-      //transition={{ duration: 0.5 }}
-      style={{
-        width: "100%",
-        height: "200px",
-        perspective: "1000px",
-        marginTop: "20px",
-        cursor: "pointer",
-        position: "relative",
-        //padding: "20px",
-       // marginLeft: "40px",
-        // marginRight: "80px"
-      }}
-    >
-      <motion.div
-        animate={{ rotateY: flipped ? 180 : 0 }}
-        transition={{ duration: 0.5 }}
-        style={{
-          width: "100%",
-          height: "100%",
-          position: "relative",
-          transformStyle: "preserve-3d",
-          //marginRight: "80px",
-          //marginLeft: "40px",
-          //transformOrigin: "center center",
-        }}
-      >
-        <div
-          style={{
-            position: "absolute",
-            width: "100%",
-            height: "100%",
-            backfaceVisibility: "hidden",
-            //WebkitBackfaceVisibility: "hidden", 
-            background: "#e5e5e5",
-            borderRadius: "16px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: "20px",
-            textAlign: "center",
-            //marginRight: "80px",
-            
-          }}
-        >
-          <div style={{ fontSize: "18px", fontWeight: "600" }}>
-            {currentCard?.question}
-          </div>
-        </div>
-
-        <div
-          style={{
-            position: "absolute",
-            width: "100%",
-            height: "100%",
-            backfaceVisibility: "hidden",
-            //WebkitBackfaceVisibility: "hidden",
-            transform: "rotateY(180deg)",
-            background: "#dbeafe",
-            borderRadius: "16px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: "20px",
-            textAlign: "center",
-            //marginRight: "80px",
-          }}
-        >
-          <div style={{ fontSize: "18px", fontWeight: "600", }}>
-            {currentCard?.answer}
-          </div>
-        </div>
-      </motion.div>
-
-      {currentCard?.known && (
-        <div
-          style={{
-            position: "absolute",
-            top: "10px",
-            right: "10px",
-            fontSize: "12px",
-            background: "#22c55e",
-            color: "white",
-            padding: "4px 8px",
-            borderRadius: "6px",
-            
-          }}
-        >
-          Known
-        </div>
-      )}
-    </motion.div> */}
+   
 
 <motion.div
   onClick={() => setFlipped(!flipped)}
@@ -897,24 +872,7 @@ const handleMarkCard = async () => {
       {currentCard?.answer}
     </div>
   </motion.div>
-  {/*{currentCard?.known && (
-  <div
-    style={{
-      position: "absolute",
-      top: "10px",
-      right: "10px",
-      fontSize: "12px",
-      background: "#22c55e",
-      color: "white",
-      padding: "4px 8px",
-      borderRadius: "6px",
-      zIndex: 10,
-    }}
-  >
-     ✓
-    //Known
-  </div>
-)}*/}
+  
 
 {currentCard?.known && (
   <div
@@ -938,6 +896,8 @@ const handleMarkCard = async () => {
     ✓
   </div>
 )}
+
+
 </motion.div>
 
   </div>
@@ -973,8 +933,7 @@ const handleMarkCard = async () => {
     <button
     onClick={handleMarkCard}
     
-     //</div> }}
-        
+             
       style={{
         padding: "12px 18px",
         borderRadius: "10px",
@@ -1052,7 +1011,7 @@ const handleMarkCard = async () => {
       {mode === "flashcards" && isSessionComplete && flashcards.length > 0 && (
   <div style={{ marginTop: "40px", textAlign: "center" }}>
     <button onClick={resetMode} style={{ marginBottom: "20px" }}>
-  ← Back to modes
+  ← Back to study modes
 </button>
     <h2>🎉 Session Complete!</h2>
 

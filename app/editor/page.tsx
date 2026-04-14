@@ -125,6 +125,7 @@ const [challenges, setChallenges] = useState<Challenge[]>([]);
  
 
 const saveNote = async () => {
+  
   const docRef = await addDoc(collection(db, "notes"), {
     title: title,
     content: notes,
@@ -132,13 +133,14 @@ const saveNote = async () => {
     createdAt: serverTimestamp(),
     totalCards: 0,
     knownCards: 0,
+    version: 1
   });
 
   return docRef.id;
 };
 
 const handleSave = async () => {
-  if (!title.trim()) {
+  if (!title.trim()) {-
     setErrorMessage("Please enter a title");
     return;
   }
@@ -184,6 +186,7 @@ if (originalPlain === currentPlain) {
   await updateDoc(doc(db, "notes", currentNoteId), {
     title: title,
     content: notes,
+    //version: increment(1),
   });
 
   setIsDirty(false);
@@ -208,6 +211,7 @@ const saveFlashcards = async (cards: FlashcardType[], noteId: string) => {
         noteId: noteId,
         deckId: deckId,
         createdAt: serverTimestamp(),
+        //noteVersion: 1,
         known: false,
       });
 
@@ -270,6 +274,7 @@ const handleSaveOnly = async () => {
   await updateDoc(doc(db, "notes", noteId), {
     title: title,
     content: notes,
+    version: increment(1),
   });
 
   setOriginalNotes(notes);
@@ -283,6 +288,7 @@ const handleGoToStudy = async () => {
   await updateDoc(doc(db, "notes", noteId), {
     title: title,
     content: notes,
+    version: increment(1),
   });
 
   setShowUpdateModal(false);
