@@ -602,7 +602,7 @@ const handleMarkCard = async () => {
 )}
       {mode === "challenge" && challenges.length > 0 && (
          <>
-    
+    <h3 style={{ marginTop: "20px" }}>Challenge Mode</h3>
   <motion.div
   key={challengeIndex}
   style={{
@@ -624,7 +624,7 @@ const handleMarkCard = async () => {
   exit={{ y: -300, opacity: 0 }}
   transition={{ type: "spring", stiffness: 300, damping: 30 }}
 >
-    <h3>Challenge Mode</h3>
+    
 
     <div style={{ textAlign: "center" }}>
       <h2>{challenges[challengeIndex]?.hook}</h2>
