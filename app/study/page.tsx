@@ -403,7 +403,60 @@ const freshCards = flashcards;
 
   //const currentCard = flashcards[currentIndex];
 const currentCard = flashcards[actualIndex];
+const handleMarkCard = async () => {
+  const card = flashcards[actualIndex];
+  const newKnownState = !card?.known;
 
+  if (card?.id) {
+    await updateDoc(doc(db, "flashcards", card.id), {
+      known: newKnownState,
+    });
+  }
+/*
+  setFlashcards((prev) =>
+    prev.map((c, idx) =>
+      idx === actualIndex
+        ? { ...c, known: newKnownState }
+        : c
+    )
+  );*/
+
+  if (newKnownState) {
+    setStreak((prev) => {
+      const newStreak = prev + 1;
+      setBestStreak((best) =>
+        newStreak > best ? newStreak : best
+      );
+      return newStreak;
+    });
+    setShowFeedback("known");
+  } else {
+    setStreak(0);
+    setShowFeedback("unknown");
+  }
+
+ /* setTimeout(() => setShowFeedback(null), 1000);
+  setFlashcards((prev) =>
+    prev.map((c, idx) =>
+      idx === actualIndex
+        ? { ...c, known: newKnownState }
+        : c
+    )
+  );*/
+
+  //setTimeout(goNext, 300);
+  setTimeout(() => {
+  setFlashcards((prev) =>
+    prev.map((c, idx) =>
+      idx === actualIndex
+        ? { ...c, known: newKnownState }
+        : c
+    )
+  );
+
+  goNext();
+}, 300);
+};
   return (
     <div
   className="app-container"
@@ -918,62 +971,8 @@ const currentCard = flashcards[actualIndex];
     }}
   >
     <button
-      onClick={() => {
-        
-  const newKnownState = !currentCard?.known;
-
-  if (newKnownState) {
-    setStreak((prev) => {
-      const newStreak = prev + 1;
-      setBestStreak((best) =>
-        newStreak > best ? newStreak : best
-      );
-      return newStreak;
-    });
-
-    setShowFeedback("known");
-
-    setTimeout(() => {
-      setShowFeedback(null);
-    }, 1000);
-
-    setTimeout(() => {
-      // ✅ MOVE STATE UPDATE HERE
-      setFlashcards((prev) =>
-        prev.map((card, idx) =>
-          idx === actualIndex
-            ? { ...card, known: newKnownState }
-            : card
-        )
-      );
-
-      goNext();
-    }, 300);
-
-  } else {
-    setStreak(0);
-
-    setShowFeedback("unknown");
-
-    setTimeout(() => {
-      setShowFeedback(null);
-    }, 1000);
-
-    setTimeout(() => {
-      // ✅ MOVE STATE UPDATE HERE
-      setFlashcards((prev) =>
-        prev.map((card, idx) =>
-          idx === actualIndex
-            ? { ...card, known: newKnownState }
-            : card
-        )
-      );
-
-      goNext();
-    }, 300);
-  }
-}}
-     
+    onClick={handleMarkCard}
+    
      //</div> }}
         
       style={{
