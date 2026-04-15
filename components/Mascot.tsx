@@ -4,9 +4,10 @@ import { motion } from "framer-motion";
 
 type MascotProps = {
   mood: string;
+  tired?: boolean;
 };
 
-export default function Mascot({ mood }: MascotProps) {
+export default function Mascot({ mood, tired }: MascotProps) {
   //console.log("MASCOT RENDERED", mood);
   return (
     <div
@@ -18,29 +19,44 @@ export default function Mascot({ mood }: MascotProps) {
       }}
     >
       <motion.div
-        animate={{
-          y: [0, -6, 0],
-          scale:
-            mood === "happy"
-              ? [1, 1.25, 1]
-              : mood === "sad"
-              ? [1, 0.85, 1]
-              : [1, 1.02, 1],
-          scaleX:
-            mood === "happy"
-              ? [1, 1.15, 1]
-              : mood === "sad"
-              ? [1, 0.9, 1]
-              : [1, 1.02, 1],
-          scaleY:
-            mood === "happy"
-              ? [1, 0.9, 1]
-              : mood === "sad"
-              ? [1, 1.1, 1]
-              : [1, 0.98, 1],
-        }}
-        transition={{ duration: 0.5 }}
-      >
+  animate={{
+    y: [0, -8, 0], // floating motion
+    scale:
+      mood === "happy"
+        ? [1, 1.15, 1]
+        : mood === "sad"
+        ? [1, 0.9, 1]
+        : [1, 1.02, 1],
+    scaleX:
+      mood === "happy"
+        ? [1, 1.1, 1]
+        : mood === "sad"
+        ? [1, 0.95, 1]
+        : [1, 1.02, 1],
+    scaleY:
+      mood === "happy"
+        ? [1, 0.95, 1]
+        : mood === "sad"
+        ? [1, 1.05, 1]
+        : [1, 0.98, 1],
+  }}
+  transition={{
+    y: {
+      duration: 2,
+      repeat: Infinity,
+      ease: "easeInOut",
+    },
+    scale: {
+      duration: 0.4,
+    },
+    scaleX: {
+      duration: 0.4,
+    },
+    scaleY: {
+      duration: 0.4,
+    },
+  }}
+>
         <svg width="80" height="80" viewBox="0 0 100 100">
           <defs>
             <radialGradient id="blobGradient" cx="35%" cy="30%" r="70%">
@@ -69,17 +85,17 @@ export default function Mascot({ mood }: MascotProps) {
 
           {/* Blob */}
           <path
-            d="M50 15 C68 12, 82 22, 85 35 C88 50, 82 70, 65 82 C50 90, 30 85, 20 70 C10 55, 15 30, 30 20 C40 12, 50 15, 50 15 Z"
-            fill="url(#blobGradient)"
-            style={{
-              filter:
-                mood === "happy"
-                  ? "drop-shadow(0 0 8px #22c55e)"
-                  : mood === "sad"
-                  ? "drop-shadow(0 0 6px #ef4444)"
-                  : "none",
-            }}
-          />
+  d="M50 15 C68 12, 82 22, 85 35 C88 50, 82 70, 65 82 C50 90, 30 85, 20 70 C10 55, 15 30, 30 20 C40 12, 50 15, 50 15 Z"
+  fill="url(#blobGradient)"
+  style={{
+  filter:
+    mood === "happy"
+      ? "blur(0.3px) drop-shadow(0 0 10px rgba(34,197,94,0.5))"
+      : mood === "sad"
+      ? "blur(0.3px) drop-shadow(0 0 8px rgba(239,68,68,0.4))"
+      : "none",
+}}
+/>
 
           {/* Eyes */}
           <motion.circle
@@ -133,17 +149,49 @@ export default function Mascot({ mood }: MascotProps) {
             />
           )}
 
-          {mood === "idle" && (
-            <line
-              x1="45"
-              y1="65"
-              x2="57"
-              y2="65"
-              stroke="#111"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-            />
-          )}
+          {tired && (
+  <line
+    x1="45"
+    y1="68"
+    x2="57"
+    y2="68"
+    stroke="#111"
+    strokeWidth="2.5"
+    strokeLinecap="round"
+  />
+)}
+
+{!tired && mood === "happy" && (
+  <path
+    d="M45 62 Q51 68 57 62"
+    stroke="#111"
+    strokeWidth="2.5"
+    fill="transparent"
+    strokeLinecap="round"
+  />
+)}
+
+{!tired && mood === "sad" && (
+  <path
+    d="M45 68 Q51 60 57 68"
+    stroke="#111"
+    strokeWidth="2.5"
+    fill="transparent"
+    strokeLinecap="round"
+  />
+)}
+
+{!tired && mood === "idle" && (
+  <line
+    x1="45"
+    y1="65"
+    x2="57"
+    y2="65"
+    stroke="#111"
+    strokeWidth="2.5"
+    strokeLinecap="round"
+  />
+)}
         </svg>
       </motion.div>
     </div>
