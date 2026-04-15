@@ -398,14 +398,22 @@ const handleMarkCard = async () => {
   });
 
   setShowFeedback("known");
-  setMascotMood("happy");
+setMascotMood("happy");
+
+setTimeout(() => {
+  setShowFeedback(null);
+}, 1500);
 
   // reset mistakes on success
   setMistakeCount(0);
 }else {
   setStreak(0);
   setShowFeedback("unknown");
-  setMascotMood("sad");
+setMascotMood("sad");
+
+setTimeout(() => {
+  setShowFeedback(null);
+}, 1200);
 
   setMistakeCount((prev) => prev + 1);
 }
@@ -901,23 +909,29 @@ marginRight: "auto",
 </div>
           {/* STATS */}
           
-
-          
-          {showFeedback && (
+<div
+  style={{
+    height: "28px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: "10px",
+  }}
+>
   <div
     style={{
-      marginTop: "10px",
-      textAlign: "center",
+      opacity: showFeedback ? 1 : 0,
+      transition: "opacity 0.4s ease",
       fontWeight: "600",
       color: showFeedback === "known" ? "#16a34a" : "#ef4444",
     }}
   >
-    {showFeedback === "known"
-      ? `🔥 Streak ${streak}`
-      : "↺ Keep practicing"}
+    {showFeedback === "known" && "🔥 Nice!"}
+    {showFeedback === "unknown" && "↺ Keep practicing"}
   </div>
-)}
+</div>
 
+  
           {/* ACTION */}
           {flipped && (
   <div
@@ -1067,7 +1081,16 @@ marginRight: "auto",
     border-radius: 50%;
     animation: spin 1s linear infinite;
   }
-
+@keyframes fadeOut {
+  0% {
+    opacity: 1;
+    transform: translate(-50%, -50%);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -60%);
+  }
+}
   @keyframes spin {
     to {
       transform: rotate(360deg);
@@ -1167,6 +1190,8 @@ marginRight: "auto",
     </style>
   </div>
 )}
+
+
 <Mascot
   mood={mascotMood}
   tired={mistakeCount >= 3}
