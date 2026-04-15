@@ -10,6 +10,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { db } from "@/lib/firebase";
 import { generateChallengeClips } from "@/lib/challengeGeneratorUtil";
 import BottomNav from "@/components/BottomNav";
+import Mascot from "@/components/Mascot";
 import type { Challenge } from "@/lib/challengeGeneratorUtil";
 /*import {
   collection,
@@ -67,6 +68,7 @@ const [showChallengeAnswer, setShowChallengeAnswer] = useState(false);
 const [restartMode, setRestartMode] = useState<"all" | "difficult">("all");
 const [loading, setLoading] = useState(false);
 const [loadingMessage, setLoadingMessage] = useState("");
+const [mascotMood, setMascotMood] = useState("idle");
 
 const activeCards =
   sessionCards.length > 0
@@ -382,13 +384,17 @@ const handleMarkCard = async () => {
       return newStreak;
     });
     setShowFeedback("known");
+    setMascotMood("happy");
   } else {
     setStreak(0);
     setShowFeedback("unknown");
+    setMascotMood("sad");
   }
 
  
-
+setTimeout(() => {
+  setMascotMood("idle");
+}, 1800);
     setTimeout(() => {
   setFlashcards((prev) =>
     prev.map((c, idx) =>
@@ -1075,6 +1081,7 @@ marginRight: "auto",
   }
 `}</style>
 </div>
+<Mascot mood={mascotMood} />
 <BottomNav
   onAdd={() => {
     const deckId = searchParams.get("deckId") || "";
