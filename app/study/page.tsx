@@ -911,24 +911,36 @@ marginRight: "auto",
           
 <div
   style={{
-    height: "28px",
+    height: "32px",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
     marginTop: "10px",
+    position: "relative",
   }}
 >
-  <div
-    style={{
-      opacity: showFeedback ? 1 : 0,
-      transition: "opacity 0.4s ease",
-      fontWeight: "600",
-      color: showFeedback === "known" ? "#16a34a" : "#ef4444",
-    }}
-  >
-    {showFeedback === "known" && "🔥 Nice!"}
-    {showFeedback === "unknown" && "↺ Keep practicing"}
-  </div>
+  <motion.div
+  initial={{ opacity: 0, y: 6, scale: 0.95 }}
+  animate={{
+    opacity: showFeedback ? 1 : 0,
+    y: showFeedback ? 0 : -4,
+    scale: showFeedback ? 1 : 0.98,
+  }}
+  transition={{
+    duration: 0.5,
+    ease: "easeOut",
+  }}
+  style={{
+    fontWeight: "600",
+    color: showFeedback === "known" ? "#16a34a" : "#ef4444",
+  }}
+>
+  {showFeedback === "known"
+    ? "🔥 Nice!"
+    : showFeedback === "unknown"
+    ? "↺ Keep practicing"
+    : ""}
+</motion.div>
 </div>
 
   
