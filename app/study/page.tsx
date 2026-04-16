@@ -73,14 +73,25 @@ const [loading, setLoading] = useState(false);
 const [loadingMessage, setLoadingMessage] = useState("");
 const [mascotMood, setMascotMood] = useState("idle");
 const [mistakeCount, setMistakeCount] = useState(0);
+const [phase, setPhase] = useState<"phase1" | "phase2">("phase1");
+const [sessionTotal, setSessionTotal] = useState(0);
+const [phaseTotal, setPhaseTotal] = useState(0);
+const [phase2Cards, setPhase2Cards] = useState<number[]>([]);
+const ENABLE_ADAPTIVE = true;
+//const ENABLE_ADAPTIVE = false;
 const activeCards =
-  sessionCards.length > 0
+  phase === "phase2"
+    ? phase2Cards
+    : sessionCards.length > 0
     ? sessionCards
     : flashcards.map((_, i) => i);
     const knownCount = flashcards.filter((c) => c.known).length;
 const someKnown = knownCount > 0;
 const allMastered = knownCount === flashcards.length;
-const actualIndex = activeCards[currentIndex] ?? currentIndex;
+const actualIndex =
+  activeCards[currentIndex] !== undefined
+    ? activeCards[currentIndex]
+    : currentIndex;
 
 const isOutdated =
   flashcards.length > 0 &&
@@ -245,24 +256,7 @@ const handleSwipeEnd = (event: any, info: any) => {
     }
   }
 };
- /* useEffect(() => {
-  if (!noteId) return;
-
-  loadFlashcards();
-
-  const fetchNote = async () => {
-    const docRef = doc(db, "notes", noteId);
-    const snapshot = await getDocs(
-      query(collection(db, "notes"), where("__name__", "==", noteId))
-    );
-
-    if (!snapshot.empty) {
-      setNote(snapshot.docs[0].data() as any);
-    }
-  };
-
-  fetchNote();
-}, [noteId]);*/
+ 
 useEffect(() => {
   if (!noteId) return;
 
@@ -280,11 +274,19 @@ useEffect(() => {
   fetchNote();
 }, [noteId]);
 
+useEffect(() => {
+  if (flashcards.length > 0 && phase === "phase1") {
+    setSessionTotal(flashcards.length);
+    setPhaseTotal(flashcards.length);
+  }
+}, [flashcards]);
+
 const handleFlashcards = async () => {
   setSessionCards([]); // ensures clean session
   setMode("flashcards");
 
   await loadFlashcards();
+  //setSessionTotal(flashcards.length);
 };
 const resetMode = () => {
   setMode(null);
@@ -292,6 +294,9 @@ const resetMode = () => {
   setCurrentIndex(0);
   setFlipped(false);
   setIsSessionComplete(false);
+  setPhase("phase1");
+  setSessionTotal(0); 
+
 };
 const handleChallenge = async () => {
   if (challenges.length === 0) {
@@ -302,9 +307,48 @@ const handleChallenge = async () => {
 };
   const goNext = () => {
     if (currentIndex >= activeCards.length - 1) {
-      setIsSessionComplete(true);
-      return;
-    }
+  if (!ENABLE_ADAPTIVE) {
+    setIsSessionComplete(true);
+    return;
+  }
+
+  const hasUnknown = flashcards.some(card => !card.known);
+
+  // 👉 START PHASE 2
+  if (phase === "phase1" && hasUnknown) {
+ const unknownIndexes = flashcards
+  .map((card, index) => (!card.known ? index : -1))
+  .filter((index) => index !== -1);
+
+setPhase2Cards(unknownIndexes);
+setPhaseTotal(unknownIndexes.length);
+
+  setPhase("phase2");
+  setCurrentIndex(0);
+  setFlipped(false);
+  return;
+}
+
+  // 👉 END SESSION
+  // 👉 If still unknown cards, keep repeating Phase 2
+// 👉 If still unknown cards, repeat Phase 2 with UPDATED cards
+if (phase === "phase2" && hasUnknown) {
+  const unknownIndexes = flashcards
+    .map((card, index) => (!card.known ? index : -1))
+    .filter((index) => index !== -1);
+
+  setPhase2Cards(unknownIndexes);
+  setPhaseTotal(unknownIndexes.length);
+
+  setCurrentIndex(0);
+  setFlipped(false);
+  return;
+}
+
+// 👉 Otherwise end session
+setIsSessionComplete(true);
+return;
+}
 
     setFlipped(false);
 
@@ -326,7 +370,8 @@ const handleChallenge = async () => {
 
 
 const restart = async () => {
-  if (!noteId) return;
+  setPhase("phase1");
+setSessionTotal(0); // ✅ ADD THIS LINE
 
   setLoading(true);
   setLoadingMessage("Refreshing your cards...");
@@ -370,6 +415,7 @@ const currentCard = flashcards[actualIndex];
 const handleMarkCard = async () => {
   const card = flashcards[actualIndex];
   const newKnownState = !card?.known;
+// ✅ TRACK FAILED / SUCCESS
 
   if (card?.id) {
     await updateDoc(doc(db, "flashcards", card.id), {
@@ -466,7 +512,12 @@ setTimeout(() => {
     </div>
 
     <div className="header-text">
-      <div className="title">Study</div>
+      
+      {phase === "phase2" && (
+  <div style={{ textAlign: "center", marginTop: "10px", fontWeight: "bold" }}>
+    Let’s review the tricky ones
+  </div>
+)}
       <div className="subtitle">Review your cards</div>
     </div>
 
@@ -1002,7 +1053,7 @@ marginRight: "auto",
 >
   {/* CARD PROGRESS */}
   <div style={{ fontSize: "14px", fontWeight: "600", color: "#111" }}>
-    Card {currentIndex + 1} / {activeCards.length}
+     Card {currentIndex + 1} / {phaseTotal}
   </div>
 
   {/* STREAK */}
