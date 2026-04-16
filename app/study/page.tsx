@@ -65,6 +65,8 @@ const [showChallengeAnswer, setShowChallengeAnswer] = useState(false);
   const [bestStreak, setBestStreak] = useState(0);
   const [showConfetti, setShowConfetti] = useState(false);
   const [showFeedback, setShowFeedback] = useState<null | "known" | "unknown">(null);
+  
+  const [isFading, setIsFading] = useState(false);
   const [isSessionComplete, setIsSessionComplete] = useState(false);
 const [restartMode, setRestartMode] = useState<"all" | "difficult">("all");
 const [loading, setLoading] = useState(false);
@@ -399,10 +401,15 @@ const handleMarkCard = async () => {
 
   setShowFeedback("known");
 setMascotMood("happy");
+setIsFading(false);
 
 setTimeout(() => {
-  setShowFeedback(null);
-}, 1500);
+  setIsFading(true); // start fade
+}, 1000);
+
+setTimeout(() => {
+  setShowFeedback(null); // remove AFTER fade
+}, 1600);
 
   // reset mistakes on success
   setMistakeCount(0);
@@ -410,10 +417,15 @@ setTimeout(() => {
   setStreak(0);
   setShowFeedback("unknown");
 setMascotMood("sad");
+setIsFading(false);
+
+setTimeout(() => {
+  setIsFading(true);
+}, 900);
 
 setTimeout(() => {
   setShowFeedback(null);
-}, 1200);
+}, 1500);
 
   setMistakeCount((prev) => prev + 1);
 }
@@ -714,7 +726,11 @@ marginRight: "auto",
   <>
     <motion.div
   initial={{ opacity: 0, y: 10 }}
-  animate={{ opacity: 1, y: 0 }}
+  animate={{
+  opacity: showFeedback ? (isFading ? 0 : 1) : 0,
+  y: showFeedback ? (isFading ? -6 : 0) : -6,
+  scale: showFeedback ? (isFading ? 0.98 : 1) : 0.98,
+}}
   transition={{ duration: 0.3 }}
       style={{
         marginTop: "20px",
