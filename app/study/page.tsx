@@ -12,14 +12,8 @@ import { generateChallengeClips } from "@/lib/challengeGeneratorUtil";
 import BottomNav from "@/components/BottomNav";
 import Mascot from "@/components/Mascot";
 import type { Challenge } from "@/lib/challengeGeneratorUtil";
-/*import {
-  collection,
-  getDocs,
-  doc,
-  updateDoc,
-  query,
-  where,
-} from "firebase/firestore";*/
+//import { generateSmartOptions } from "@/lib/smartOptions";
+
 
 import {
   collection,
@@ -41,18 +35,27 @@ type FlashcardType = {
   noteVersion?: number;
 };
 
-//export default function StudyPage() {
   function StudyPage() {
-  const [isNotesOpen, setIsNotesOpen] = useState(true);
-  const [mode, setMode] = useState<"flashcards" | "challenge" | null>(null);
+  
+  const [score, setScore] = useState(0);
+  const [difficulty, setDifficulty] = useState("medium");
+const [selectedOption, setSelectedOption] = useState<number | null>(null);
+const [streak, setStreak] = useState(0);
+const [showResult, setShowResult] = useState(false);  const [isNotesOpen, setIsNotesOpen] = useState(true);
+
+
+const [mode, setMode] = useState<"flashcards" | "challenge" | null>(null);
   const searchParams = useSearchParams();
   const router = useRouter();
   const noteId = searchParams.get("noteId");
 const [sessionCards, setSessionCards] = useState<number[]>([]);
   const [flashcards, setFlashcards] = useState<FlashcardType[]>([]);
   const [challenges, setChallenges] = useState<Challenge[]>([]);
+  //const [isLoadingChallenges, setIsLoadingChallenges] = useState(false);
 const [challengeIndex, setChallengeIndex] = useState(0);
-const [showChallengeAnswer, setShowChallengeAnswer] = useState(false);
+
+
+
   const [note, setNote] = useState<{
   title: string;
   content: string;
@@ -60,8 +63,14 @@ const [showChallengeAnswer, setShowChallengeAnswer] = useState(false);
 } | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [flipped, setFlipped] = useState(false);
+  const [currentOptions, setCurrentOptions] = useState<string[]>([]);
+  useEffect(() => {
+  if (challenges.length > 0) {
+    setCurrentOptions(challenges[challengeIndex]?.options || []);
+  }
+}, [challengeIndex, challenges]);
   //const [knownCards, setKnownCards] = useState<number[]>([]);
-  const [streak, setStreak] = useState(0);
+  
   const [bestStreak, setBestStreak] = useState(0);
   const [showConfetti, setShowConfetti] = useState(false);
   const [showFeedback, setShowFeedback] = useState<null | "known" | "unknown">(null);
@@ -156,19 +165,20 @@ const isOutdated =
   setLoading(false);
 };
 const handleGenerateChallenges = async () => {
+  setChallenges([]);
   if (!note?.content) return;
 
   setLoading(true);
   setLoadingMessage("Creating challenge clips...");
 
   try {
-    const result = await generateChallengeClips(note.content);
+    const result = await generateChallengeClips(note.content, difficulty);
 
     setLoadingMessage("Preparing your challenge session...");
 
     setChallenges(result);
     setChallengeIndex(0);
-    setShowChallengeAnswer(false);
+    
 
     setLoading(false);
   } catch (err) {
@@ -245,14 +255,14 @@ const handleSwipeEnd = (event: any, info: any) => {
   if (info.offset.y < -threshold) {
     if (challengeIndex < challenges.length - 1) {
       setChallengeIndex((prev) => prev + 1);
-      setShowChallengeAnswer(false);
+      
     }
   }
 
   if (info.offset.y > threshold) {
     if (challengeIndex > 0) {
       setChallengeIndex((prev) => prev - 1);
-      setShowChallengeAnswer(false);
+      
     }
   }
 };
@@ -298,11 +308,8 @@ const resetMode = () => {
   setSessionTotal(0); 
 
 };
-const handleChallenge = async () => {
-  if (challenges.length === 0) {
-    await handleGenerateChallenges();
-  }
-
+const handleChallenge = () => {
+  setChallenges([]); // ensure fresh state
   setMode("challenge");
 };
   const goNext = () => {
@@ -496,11 +503,15 @@ setTimeout(() => {
     <div
   className="app-container"
   style={{
-  minHeight: "100vh",
-  display: "flex",
-  flexDirection: "column",
-}}
+    minHeight: "100vh",
+    display: "flex",
+    flexDirection: "column",
+  }}
 >
+  <div style={{ color: "red" }}>
+    DEBUG → mode: {mode}
+  </div>
+  
       {/* <h1>Study</h1> */}
 
       {/* HEADER */}
@@ -639,6 +650,38 @@ setTimeout(() => {
     ← Back to study modes
   </button>
 
+
+{mode === "challenge" && challenges.length === 0 && (
+  <div style={{ marginTop: "20px", textAlign: "center" }}>
+    <h3>Select Difficulty</h3>
+
+    <div style={{ marginBottom: "12px" }}>
+      <select
+        value={difficulty}
+        onChange={(e) => setDifficulty(e.target.value)}
+      >
+        <option value="easy">Easy</option>
+        <option value="medium">Medium</option>
+        <option value="hard">Hard</option>
+      </select>
+    </div>
+
+    <button
+      onClick={handleGenerateChallenges}
+      style={{
+        padding: "10px 16px",
+        borderRadius: "8px",
+        border: "none",
+        background: "#2563eb",
+        color: "white",
+        cursor: "pointer",
+      }}
+    >
+      Start Challenge
+    </button>
+  </div>
+)}
+
   {mode === "challenge" && challenges.length > 0 && (
     <div
       style={{
@@ -756,102 +799,70 @@ marginRight: "auto",
         {challenges[challengeIndex]?.question}
       </p>
 
-     // test change 123
-{!showChallengeAnswer ? (
-  <div style={{ marginTop: "20px" }}>
+     
+<div style={{ marginTop: "20px" }}>
+  <p style={{ fontWeight: "bold" }}>
+  Score: {score} | Streak: {streak}
+</p>
+
+  {currentOptions.map((option: string, index: number) => (
     <button
-      onClick={() => setShowChallengeAnswer(true)}
+      key={index}
+      onClick={() => {
+  if (showResult) return;
+
+  const isCorrect = index === challenges[challengeIndex]?.correctIndex;
+
+  if (isCorrect) {
+    setScore((prev) => prev + 1);
+    setStreak((prev) => prev + 1);
+  } else {
+    setStreak(0);
+  }
+
+  setSelectedOption(index);
+  setShowResult(true);
+}}
       style={{
-        padding: "10px 16px",
+        display: "block",
+        width: "100%",
+        marginBottom: "10px",
+        padding: "12px",
         borderRadius: "8px",
-        border: "none",
-        background: "#2563eb",
-        color: "white",
+        border: "1px solid #ccc",
+        background:
+  showResult && index === challenges[challengeIndex]?.correctIndex
+    ? "#c8f7c5"
+    : showResult && selectedOption === index
+    ? "#f7c5c5"
+    : "#fff",
         cursor: "pointer",
       }}
     >
-      Reveal Answer
+      {option}
     </button>
-  </div>
-) : (
-  <>
-    <motion.div
-  initial={{ opacity: 0, y: 10 }}
-  animate={{
-  opacity: showFeedback ? (isFading ? 0 : 1) : 0,
-  y: showFeedback ? (isFading ? -6 : 0) : -6,
-  scale: showFeedback ? (isFading ? 0.98 : 1) : 0.98,
-}}
-  transition={{ duration: 0.3 }}
+  ))}
+
+  {showResult && (
+    <button
+      onClick={() => {
+        setShowResult(false);
+        setSelectedOption(null);
+        setChallengeIndex((prev) => prev + 1);
+      }}
       style={{
         marginTop: "20px",
-        padding: "14px",
-        background: "#eef2ff",
-        borderRadius: "10px",
-        border: "1px solid #c7d2fe",
-        textAlign: "center",
+        padding: "10px 16px",
+        borderRadius: "8px",
+        background: "#2563eb",
+        color: "white",
+        border: "none",
       }}
     >
-      <div
-        style={{
-          fontSize: "12px",
-          fontWeight: "600",
-          color: "#4f46e5",
-          marginBottom: "6px",
-          letterSpacing: "0.5px",
-        }}
-      >
-        ANSWER
-      </div>
-
-      <div style={{ fontWeight: "600", fontSize: "16px" }}>
-        {challenges[challengeIndex]?.answer}
-      </div>
-    </motion.div>
-
-    <motion.div
-  initial={{ opacity: 0, y: 10 }}
-  animate={{ opacity: 1, y: 0 }}
-  transition={{ duration: 0.4, delay: 0.15 }}
-  style={{
-    marginTop: "16px",
-    fontSize: "14px",
-    color: "#555",
-    textAlign: "center",
-  }}
->
-      {challenges[challengeIndex]?.explanation}
-    </motion.div>
-
-    <div style={{ marginTop: "20px" }}>
-      <button
-        onClick={() => {
-          if (challengeIndex > 0) {
-            setChallengeIndex(challengeIndex - 1);
-            setShowChallengeAnswer(false);
-          }
-        }}
-        style={{ marginRight: "10px" }}
-      >
-        ⬅ Prev
-      </button>
-
-      <button
-        onClick={() => {
-          if (challengeIndex < challenges.length - 1) {
-            setChallengeIndex(challengeIndex + 1);
-            setShowChallengeAnswer(false);
-          }
-        }}
-      >
-        Next ➡
-      </button>
-    </div>
-  </>
-)}
-
-
-
+      Next
+    </button>
+  )}
+</div>
 </div>
   </motion.div>
 </>
