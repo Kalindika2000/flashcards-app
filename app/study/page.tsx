@@ -12,14 +12,7 @@ import { generateChallengeClips } from "@/lib/challengeGeneratorUtil";
 import BottomNav from "@/components/BottomNav";
 import Mascot from "@/components/Mascot";
 import type { Challenge } from "@/lib/challengeGeneratorUtil";
-/*import {
-  collection,
-  getDocs,
-  doc,
-  updateDoc,
-  query,
-  where,
-} from "firebase/firestore";*/
+
 
 import {
   collection,
@@ -30,6 +23,7 @@ import {
   where,
   addDoc,
   deleteDoc, 
+  increment,
 } from "firebase/firestore";
 
 type FlashcardType = {
@@ -39,6 +33,8 @@ type FlashcardType = {
   noteId?: string;
   known?: boolean;
   noteVersion?: number;
+  timesSeen?: number;
+  timesCorrect?: number;
 };
 
 //export default function StudyPage() {
@@ -92,23 +88,7 @@ const isOutdated =
   
 
   // ✅ LOAD ONLY CARDS FOR THIS NOTE
- /* const loadFlashcards = async () => {
-    if (!noteId) return;
-
-    const q = query(
-      collection(db, "flashcards"),
-      where("noteId", "==", noteId)
-    );
-
-    const snapshot = await getDocs(q);
-
-    const cards = snapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...(doc.data() as FlashcardType),
-    }));
-
-    setFlashcards(cards);
-  };*/
+ 
 
   const loadFlashcards = async () => {
   if (!noteId) return;
@@ -339,18 +319,69 @@ const freshCards = flashcards;
   setFlashcards(freshCards);
 
   let newCards: number[];
-
+console.log("RESTART MODE:", restartMode);
   if (restartMode === "all") {
     // RESET DB FLAGS
    
-    newCards = freshCards.map((_, i) => i);
+    //newCards = freshCards.map((_, i) => i);
+
+    const sorted = freshCards
+  .map((card, i) => {
+    const timesSeen = card.timesSeen || 0;
+    const timesCorrect = card.timesCorrect || 0;
+
+    // NEW cards → highest priority
+    if (timesSeen === 0) {
+      return { index: i, priority: 2 };
+    }
+
+    const accuracy = timesCorrect / timesSeen;
+
+    // Needs Review (<70%) → medium priority
+    if (accuracy < 0.7) {
+      return { index: i, priority: 1 };
+    }
+
+    // Got It (>=70%) → lowest priority
+    return { index: i, priority: 0 };
+  })
+  .sort((a, b) => b.priority - a.priority);
+
+newCards = sorted.map((item) => item.index);
 
     //setKnownCards([]);
   } else {
     // ✅ FILTER USING DB VALUE (NOT local state)
-    newCards = freshCards
-      .map((card, i) => (card.known ? -1 : i))
-      .filter((i) => i !== -1);
+    const filtered = freshCards
+  .map((card, i) => {
+    const timesSeen = card.timesSeen || 0;
+    const timesCorrect = card.timesCorrect || 0;
+
+    if (timesSeen === 0) return i;
+
+    const accuracy = timesCorrect / timesSeen;
+
+    return accuracy < 0.7 ? i : -1;
+  })
+  .filter((i) => i !== -1);
+
+// NOW SORT the filtered cards
+const sorted = filtered
+  .map((i) => {
+    const card = freshCards[i];
+    const timesSeen = card.timesSeen || 0;
+    const timesCorrect = card.timesCorrect || 0;
+
+    const accuracy =
+      timesSeen === 0 ? 0 : timesCorrect / timesSeen;
+
+    const difficulty = 1 - accuracy;
+
+    return { index: i, difficulty };
+  })
+  .sort((a, b) => b.difficulty - a.difficulty);
+
+newCards = sorted.map((item) => item.index);
   }
 
   setSessionCards(newCards);
@@ -367,14 +398,17 @@ const freshCards = flashcards;
 
   //const currentCard = flashcards[currentIndex];
 const currentCard = flashcards[actualIndex];
-const handleMarkCard = async () => {
+const handleMarkCard = async (isCorrect: boolean) => {
   const card = flashcards[actualIndex];
-  const newKnownState = !card?.known;
+  const newKnownState = isCorrect;
 
   if (card?.id) {
     await updateDoc(doc(db, "flashcards", card.id), {
-      known: newKnownState,
-    });
+  known: newKnownState,
+  timesSeen: increment(1),
+  timesCorrect: newKnownState ? increment(1) : increment(0),
+});
+ 
   }
 
 
@@ -436,12 +470,19 @@ setTimeout(() => {
 }, 1800);
     setTimeout(() => {
   setFlashcards((prev) =>
-    prev.map((c, idx) =>
-      idx === actualIndex
-        ? { ...c, known: newKnownState }
-        : c
-    )
-  );
+  prev.map((c, idx) =>
+    idx === actualIndex
+      ? {
+          ...c,
+          known: newKnownState,
+          timesSeen: (c.timesSeen || 0) + 1,
+          timesCorrect: newKnownState
+            ? (c.timesCorrect || 0) + 1
+            : (c.timesCorrect || 0),
+        }
+      : c
+  )
+);
 
   goNext();
 }, 300);
@@ -969,24 +1010,13 @@ marginRight: "auto",
       justifyContent: "center",
     }}
   >
-    <button
-    onClick={handleMarkCard}
-    
-             
-      style={{
-        padding: "12px 18px",
-        borderRadius: "10px",
-        border: "none",
-        background: currentCard?.known ? "#ef4444" : "#22c55e",
-        color: "white",
-        cursor: "pointer",
-        width: "90%",
-        maxWidth: "320px",
-        textAlign: "center",
-      }}
-    >
-      {currentCard?.known ? "✕ Mark as difficult" : "✓ I know this"}
-    </button>
+   <button onClick={() => handleMarkCard(true)}>
+  Easy
+</button>
+
+<button onClick={() => handleMarkCard(false)}>
+  🔁 Needs Review
+</button>
   </div>
 )}
 
