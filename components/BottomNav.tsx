@@ -9,13 +9,8 @@ type BottomNavProps = {
   onHome?: () => void;
 };
 
-//const BottomNav: React.FC<BottomNavProps> = ({ onAdd }) => {
-//export default function BottomNav({ onAdd }: BottomNavProps) {
-  //export default function BottomNav({ onAdd, showAdd = true }: BottomNavProps) {
-    export default function BottomNav({ onAdd, showAdd = true, onHome }: BottomNavProps) {
+export default function BottomNav({ onAdd, showAdd = true, onHome }: BottomNavProps) {
   const router = useRouter();
-  console.log("onAdd is:", onAdd);
-  //const router = useRouter();
 
   return (
     <div
@@ -61,6 +56,5 @@ type BottomNavProps = {
 )}
     </div>
   );
-    };
-
+}
 

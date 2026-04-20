@@ -8,7 +8,6 @@ type MascotProps = {
 };
 
 export default function Mascot({ mood, tired }: MascotProps) {
-  //console.log("MASCOT RENDERED", mood);
   return (
     <div
       style={{

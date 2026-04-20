@@ -1,23 +1,53 @@
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
-console.log("🔥 THIS IS THE API FILE BEING USED");
+import {
+  parseNotesBody,
+  requireOpenAiKey,
+} from "@/lib/api/parseNotesBody";
+import { rateLimitGenerate } from "@/lib/api/rateLimit";
+
 const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+/** POST — body: { notes: string }. Rate-limited; optional Firebase ID token can be added later. */
+
+function normalizeFlashcards(raw: unknown): Array<{ question: string; answer: string }> {
+  if (!Array.isArray(raw)) return [];
+  const out: Array<{ question: string; answer: string }> = [];
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue;
+    const q = (item as { question?: unknown }).question;
+    const a = (item as { answer?: unknown }).answer;
+    if (typeof q !== "string" || typeof a !== "string") continue;
+    const question = q.trim();
+    const answer = a.trim();
+    if (!question || !answer) continue;
+    out.push({ question, answer });
+  }
+  return out;
+}
+
 export async function POST(req: Request) {
+  const limited = rateLimitGenerate(req);
+  if (limited) return limited;
+
+  const missingKey = requireOpenAiKey();
+  if (missingKey) return missingKey;
+
+  let body: unknown;
   try {
-    const { notes } = await req.json();
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
 
-    console.log("NOTES RECEIVED IN API:", notes);
+  const parsed = parseNotesBody(body);
+  if (!parsed.ok) return parsed.response;
 
-    if (!notes) {
-      return NextResponse.json(
-        { error: "No notes provided" },
-        { status: 400 }
-      );
-    }
+  const { notes } = parsed;
 
+  try {
     const completion = await client.chat.completions.create({
       model: "gpt-4.1-mini",
       messages: [
@@ -33,28 +63,27 @@ export async function POST(req: Request) {
       ],
     });
 
-    const text = completion.choices[0].message.content;
+    const text = completion.choices[0]?.message?.content;
 
-    console.log("RAW AI RESPONSE:", text);
-
-    let flashcards = [];
-
+    let rawParsed: unknown;
     try {
-      flashcards = JSON.parse(text || "[]");
-    } catch (e) {
-      console.error("PARSE FAILED:", text);
+      rawParsed = JSON.parse(text || "[]");
+    } catch {
+      console.error("Flashcard AI response JSON parse failed");
       return NextResponse.json(
         { error: "Invalid AI response format" },
-        { status: 500 }
+        { status: 502 },
       );
     }
 
+    const flashcards = normalizeFlashcards(rawParsed);
+
     return NextResponse.json({ flashcards });
   } catch (error) {
-    console.error("API ERROR:", error);
+    console.error("POST /api/generate:", error);
     return NextResponse.json(
       { error: "Failed to generate flashcards" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

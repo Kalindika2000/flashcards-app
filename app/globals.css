@@ -1,4 +1,19 @@
+@import "tailwindcss";
 
+/* Multiple choice — one-shot emphasis on correct option (Challenge mode) */
+@keyframes mcq-correct-pulse-once {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.02);
+  }
+}
+
+.mcq-correct-pulse-once {
+  animation: mcq-correct-pulse-once 0.3s ease-in-out 1;
+}
 
 body {
   margin: 0;

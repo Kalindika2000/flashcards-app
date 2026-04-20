@@ -3,78 +3,52 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
-import { db } from "../lib/firebase";
-import { collection, addDoc, getDocs, query, where } from "firebase/firestore";
 import { ProgressCircle } from "@/components/ProgressCircle";
 import BottomNav from "@/components/BottomNav";
-type Deck = {
-  id: string;
-  title: string;
-  subject: string;
-  image: string;
+import type { Deck } from "@/features/decks/types/deck";
+import { createDeck, getDecksByUser } from "@/lib/repositories/decksRepository";
+import { getNotesByDeck } from "@/lib/repositories/notesRepository";
+import { getFlashcardsByNote } from "@/lib/repositories/flashcardsRepository";
+import { useAuth } from "@/components/auth/AuthProvider";
+import { useToast } from "@/components/ui/ToastProvider";
 
-  totalCards?: number;
-  knownCards?: number;
-};
 export default function Home() {
   const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
+  const { showToast } = useToast();
 
-  const [decks, setDecks] = useState<Deck[]>([
- /* {
-    id: "1",
-    title: "Chemistry Exam Prep",
-    subject: "Chemistry",
-    image: "https://picsum.photos/400/300?random=1",
-  },
-  {
-    id: "2",
-    title: "Math Formulas",
-    subject: "Math",
-    image: "https://picsum.photos/400/300?random=2"
-  },*/
-]);
+  const [decks, setDecks] = useState<Deck[]>([]);
 const [showForm, setShowForm] = useState(false);
-useEffect(() => {
-  console.log("showForm changed:", showForm);
-}, [showForm]);
 const [title, setTitle] = useState("");
 const [subject, setSubject] = useState("");
 
 
 
 useEffect(() => {
+  if (authLoading || !user) return;
+
   const fetchDecks = async () => {
-    const deckSnapshot = await getDocs(collection(db, "decks"));
+    const userId = user.uid;
+    const decks = await getDecksByUser(userId);
 
     const decksData = await Promise.all(
-      deckSnapshot.docs.map(async (deckDoc, index) => {
-        const deckId = deckDoc.id;
-
-        const notesSnapshot = await getDocs(
-          query(collection(db, "notes"), where("deckId", "==", deckId))
-        );
-
-        const noteIds = notesSnapshot.docs.map((n) => n.id);
+      decks.map(async (deck, index) => {
+        const notes = await getNotesByDeck(deck.id, userId);
+        const noteIds = notes.map((n) => n.id);
 
         let totalCards = 0;
         let knownCards = 0;
 
         for (const noteId of noteIds) {
-          const flashSnapshot = await getDocs(
-            query(collection(db, "flashcards"), where("noteId", "==", noteId))
-          );
-
-          totalCards += flashSnapshot.docs.length;
-
-          knownCards += flashSnapshot.docs.filter(
-            (doc) => doc.data().known === true
-          ).length;
+          const flashcards = await getFlashcardsByNote(noteId, userId);
+          totalCards += flashcards.length;
+          knownCards += flashcards.filter((card) => card.known === true).length;
         }
 
         return {
-          id: deckId,
-          title: deckDoc.data().title,
-          subject: deckDoc.data().subject,
+          id: deck.id,
+          title: deck.title,
+          subject: deck.subject,
           image: `https://picsum.photos/400/300?random=${index + 1}`,
           totalCards,
           knownCards,
@@ -85,8 +59,8 @@ useEffect(() => {
     setDecks(decksData);
   };
 
-  fetchDecks();
-}, []);
+  void fetchDecks();
+}, [authLoading, user]);
     
   return (
     <div className="app-container">
@@ -135,7 +109,11 @@ useEffect(() => {
     className="create-btn"
     onClick={async () => {
       if (!title || !subject) {
-        alert("Please fill in all fields");
+        showToast("Please fill in all fields.", "error");
+        return;
+      }
+      if (!user) {
+        showToast("You must be signed in.", "error");
         return;
       }
 
@@ -144,10 +122,9 @@ useEffect(() => {
         subject,
         image: "https://picsum.photos/400/300",
       };
-
-      const docRef = await addDoc(collection(db, "decks"), newDeck);
-
-      setDecks([...decks, { id: docRef.id, ...newDeck }]);
+      const userId = user.uid;
+      const createdDeck = await createDeck({ ...newDeck, userId });
+      setDecks([...decks, createdDeck]);
 
       setTitle("");
       setSubject("");

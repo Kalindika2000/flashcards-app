@@ -11,7 +11,10 @@ const eslintConfig = defineConfig([
     ".next/**",
     "out/**",
     "build/**",
+    "coverage/**",
     "next-env.d.ts",
+    // Nested copy / backup tree in this repo (must not be linted)
+    "flashcards-app-clean/**",
   ]),
 ]);
 

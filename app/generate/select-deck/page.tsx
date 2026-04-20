@@ -3,41 +3,31 @@
 import { Suspense } from "react";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { db } from "@/lib/firebase";
-import { collection, getDocs } from "firebase/firestore";
-import { useSearchParams } from "next/navigation";
-
-type Deck = {
-  id: string;
-  title: string;
-  subject: string;
-  image: string;
-};
+import { useAuth } from "@/components/auth/AuthProvider";
+import type { Deck } from "@/features/decks/types/deck";
+import { getDecksByUser } from "@/lib/repositories/decksRepository";
 
 function SelectDeck() {
-    const searchParams = useSearchParams();
-const selectedDeckId = searchParams.get("deckId");
-
-console.log("Received deckId:", selectedDeckId);
   const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
   const [decks, setDecks] = useState<Deck[]>([]);
 
   useEffect(() => {
+    if (authLoading || !user) return;
+
     const fetchDecks = async () => {
-      const snapshot = await getDocs(collection(db, "decks"));
-
-      const data = snapshot.docs.map((doc, index) => ({
-        id: doc.id,
-        title: doc.data().title,
-        subject: doc.data().subject,
-        image: `https://picsum.photos/400/300?random=${index + 1}`,
+      const list = await getDecksByUser(user.uid);
+      const data = list.map((deck, index) => ({
+        ...deck,
+        image:
+          deck.image ||
+          `https://picsum.photos/400/300?random=${index + 1}`,
       }));
-
       setDecks(data);
     };
 
-    fetchDecks();
-  }, []);
+    void fetchDecks();
+  }, [authLoading, user]);
 
   return (
     <div className="app-container">
@@ -54,11 +44,8 @@ console.log("Received deckId:", selectedDeckId);
               onClick={() => {
                 router.push(`/generate?deckId=${deck.id}`);
               }}
-            /* onClick={() => {
-  console.log("CLICK WORKING");
-}}*/
             >
-              <img src={deck.image} className="deck-image" />
+              <img src={deck.image} className="deck-image" alt="" />
 
               <div className="deck-content">
                 <div className="deck-title">{deck.title}</div>
@@ -71,6 +58,7 @@ console.log("Received deckId:", selectedDeckId);
     </div>
   );
 }
+
 export default function SelectDeckPageWrapper() {
   return (
     <Suspense fallback={<div>Loading...</div>}>

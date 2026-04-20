@@ -2,69 +2,50 @@
 
 
 "use client";
-console.log("NEW VERSION OF DECK PAGE");
+
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { db } from "@/lib/firebase";
-import { collection, getDocs, query, where } from "firebase/firestore";
 import { ProgressCircle } from "@/components/ProgressCircle";
 import BottomNav from "@/components/BottomNav";
-
-type Note = {
-  id: string;
-  title: string;
-  content: string;
-  deckId: string;
-
-  totalCards?: number;
-  knownCards?: number;
-};
+import type { Note } from "@/features/notes/types/note";
+import { getNotesByDeck } from "@/lib/repositories/notesRepository";
+import { getFlashcardsByNote } from "@/lib/repositories/flashcardsRepository";
+import { useAuth } from "@/components/auth/AuthProvider";
 
 export default function DeckNotesPage() {
-    
   const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
   const params = useParams();
   const deckId = params.deckId as string;
 
   const [notes, setNotes] = useState<Note[]>([]);
 
   useEffect(() => {
+    if (authLoading || !user) return;
+
     const fetchNotes = async () => {
-      const q = query(
-        collection(db, "notes"),
-        where("deckId", "==", deckId)
+      const userId = user.uid;
+      const notes = await getNotesByDeck(deckId, userId);
+
+      const data = await Promise.all(
+        notes.map(async (note) => {
+          const flashcards = await getFlashcardsByNote(note.id, userId);
+          const totalCards = flashcards.length;
+          const knownCards = flashcards.filter((card) => card.known === true).length;
+
+          return {
+            ...note,
+            totalCards,
+            knownCards,
+          };
+        })
       );
 
-      const snapshot = await getDocs(q);
-
-const data = await Promise.all(
-  snapshot.docs.map(async (doc) => {
-    const noteId = doc.id;
-
-    const flashSnapshot = await getDocs(
-      query(collection(db, "flashcards"), where("noteId", "==", noteId))
-    );
-
-    const totalCards = flashSnapshot.docs.length;
-
-    const knownCards = flashSnapshot.docs.filter(
-      (card) => card.data().known === true
-    ).length;
-
-    return {
-      id: noteId,
-      ...(doc.data() as Omit<Note, "id">),
-      totalCards,
-      knownCards,
-    };
-  })
-);
-
-setNotes(data);
+      setNotes(data);
     };
 
-    if (deckId) fetchNotes();
-  }, [deckId]);
+    if (deckId) void fetchNotes();
+  }, [deckId, authLoading, user]);
 
  return (
   <div className="app-container">
@@ -83,9 +64,8 @@ setNotes(data);
         <div
           className="fab"
           onClick={() => {
-            //console.log("Navigating with deckId:", deckId);
-            router.push(`/editor?deckId=${deckId}`)
-            }}
+            router.push(`/editor?deckId=${deckId}`);
+          }}
         >
           +
         </div>

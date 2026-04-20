@@ -1,25 +1,10 @@
-export type Challenge = {
-  hook: string;
-  context: string;
-  question: string;
-  answer: string;
-  explanation: string;
-};
+import type { Challenge } from "@/features/generation/types/challenge";
+import { generateChallengesFromNotes } from "@/lib/services/challengeGenerationService";
 
-export const generateChallengeClips = async (notes: string): Promise<Challenge[]> => {
-  try {
-    const response = await fetch("/api/generate-challenges", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ notes }),
-    });
+export type { Challenge };
 
-    const data = await response.json();
-    return data.challenges || [];
-  } catch (err) {
-    console.error("Error generating challenges:", err);
-    return [];
-  }
+export const generateChallengeClips = async (
+  notes: string,
+): Promise<Challenge[]> => {
+  return generateChallengesFromNotes(notes);
 };

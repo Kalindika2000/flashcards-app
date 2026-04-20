@@ -21,7 +21,8 @@
     "jsx": "preserve",
     "types": [
       "react",
-      "react-dom"
+      "react-dom",
+      "@testing-library/jest-dom"
     ],
     "incremental": true,
     "plugins": [
@@ -44,6 +45,9 @@
     "**/*.mts"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "vitest.config.ts",
+    "vitest.setup.ts",
+    "coverage"
   ]
 }
