@@ -5,16 +5,9 @@ import { useEffect, useState } from "react";
 export type ChallengeSummaryProps = {
   correctCount: number;
   totalQuestions: number;
-  difficultyBreakdown: {
-    easy: number;
-    medium: number;
-    hard: number;
-  };
-  weakCardsCount?: number;
-  weakFlashcardIds?: string[];
-  onReviewWeakCards?: () => void | Promise<void>;
-  /** Prior run was a targeted weak-card review (not the main deck challenge). */
-  isReviewSession?: boolean;
+  totalIncorrect?: number;
+  reviewFlashcardIds?: string[];
+  onReviewCards?: () => void | Promise<void>;
   onRestart: () => void;
   onExit: () => void;
 };
@@ -25,11 +18,9 @@ const cardBase =
 export default function ChallengeSummary({
   correctCount,
   totalQuestions,
-  difficultyBreakdown,
-  weakCardsCount: _weakCardsCount,
-  weakFlashcardIds,
-  onReviewWeakCards,
-  isReviewSession = false,
+  totalIncorrect,
+  reviewFlashcardIds,
+  onReviewCards,
   onRestart,
   onExit,
 }: ChallengeSummaryProps) {
@@ -37,7 +28,8 @@ export default function ChallengeSummary({
   const [isRestarting, setIsRestarting] = useState(false);
   const [reviewCtaEntered, setReviewCtaEntered] = useState(false);
 
-  const weakCount = weakFlashcardIds?.length ?? 0;
+  const reviewCountFromIds = reviewFlashcardIds?.length ?? 0;
+  const incorrectCount = totalIncorrect ?? reviewCountFromIds;
 
   useEffect(() => {
     const id = requestAnimationFrame(() => setEntered(true));
@@ -45,7 +37,7 @@ export default function ChallengeSummary({
   }, []);
 
   useEffect(() => {
-    if (weakCount === 0 || !onReviewWeakCards) {
+    if (incorrectCount <= 0 || !onReviewCards) {
       setReviewCtaEntered(false);
       return;
     }
@@ -54,7 +46,7 @@ export default function ChallengeSummary({
       requestAnimationFrame(() => setReviewCtaEntered(true));
     });
     return () => cancelAnimationFrame(id);
-  }, [weakCount, onReviewWeakCards]);
+  }, [incorrectCount, onReviewCards]);
 
   const accuracy =
     totalQuestions > 0
@@ -66,17 +58,10 @@ export default function ChallengeSummary({
       ? "Nice work!"
       : "Challenge Complete";
 
-  const hardCount = difficultyBreakdown.hard ?? 0;
-  const mediumCount = difficultyBreakdown.medium ?? 0;
-
-  let insight = "";
-  if (hardCount > 0) {
-    insight = `Focus on ${hardCount} harder card${hardCount > 1 ? "s" : ""} next`;
-  } else if (mediumCount > 0) {
-    insight = `You're close—review ${mediumCount} medium card${mediumCount > 1 ? "s" : ""}`;
-  } else {
-    insight = "Great job—you're strong across all cards";
-  }
+  const recommendation =
+    incorrectCount > 0
+      ? `You got ${incorrectCount} cards wrong — reviewing them now is the fastest way to improve.`
+      : "Perfect score. Great job!";
 
   const progressColor =
     accuracy >= 80
@@ -132,32 +117,24 @@ export default function ChallengeSummary({
         <p className="text-center text-xs uppercase tracking-wide text-gray-400 dark:text-gray-500">
           Performance
         </p>
-        <section className={`${cardBase} p-5`} aria-label="Difficulty mix">
+        <section className={`${cardBase} p-5`} aria-label="Performance breakdown">
+          <p className="mb-3 text-center text-sm text-gray-500 dark:text-gray-400">
+            Score: {correctCount} / {totalQuestions}
+          </p>
           <div className="flex items-center justify-between border-b border-gray-100 py-2 dark:border-gray-800">
             <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400">
-              <span aria-hidden>🟢</span>
-              <span>Easy</span>
+              <span>Correct</span>
             </div>
             <span className="font-medium tabular-nums text-gray-900 dark:text-gray-100">
-              {difficultyBreakdown.easy}
-            </span>
-          </div>
-          <div className="flex items-center justify-between border-b border-gray-100 py-2 dark:border-gray-800">
-            <div className="flex items-center gap-2 text-sm text-yellow-600 dark:text-yellow-500">
-              <span aria-hidden>🟡</span>
-              <span>Medium</span>
-            </div>
-            <span className="font-medium tabular-nums text-gray-900 dark:text-gray-100">
-              {difficultyBreakdown.medium}
+              {correctCount}
             </span>
           </div>
           <div className="flex items-center justify-between py-2">
             <div className="flex items-center gap-2 text-sm text-red-600 dark:text-red-400">
-              <span aria-hidden>🔴</span>
-              <span>Hard</span>
+              <span>Incorrect</span>
             </div>
             <span className="font-medium tabular-nums text-gray-900 dark:text-gray-100">
-              {difficultyBreakdown.hard}
+              {incorrectCount}
             </span>
           </div>
         </section>
@@ -168,19 +145,17 @@ export default function ChallengeSummary({
           Recommendation
         </p>
         <p className="text-center text-sm text-gray-600 dark:text-gray-400">
-          {insight}
+          {recommendation}
         </p>
-        {isReviewSession ? (
-          <p className="mt-2 text-center text-sm text-gray-500 dark:text-gray-400">
-            {accuracy >= 70
-              ? "Nice—these cards are improving"
-              : "You've reviewed your weak cards"}
+        {incorrectCount > 0 ? (
+          <p className="text-center text-xs text-gray-500 dark:text-gray-400">
+            Focused on the cards you got wrong
           </p>
         ) : null}
       </div>
 
       <div className="mt-6 flex flex-col gap-3">
-        {weakCount > 0 && onReviewWeakCards ? (
+        {incorrectCount > 0 && onReviewCards ? (
           <div
             className={[
               "flex flex-col gap-1 transition-all duration-300",
@@ -191,32 +166,33 @@ export default function ChallengeSummary({
           >
             <button
               type="button"
-              onClick={() => void onReviewWeakCards()}
+              onClick={() => void onReviewCards()}
               className="w-full rounded-xl bg-green-500 py-3.5 text-center text-sm font-semibold text-white shadow-sm transition-all duration-150 hover:scale-[1.02] hover:bg-green-600 active:scale-[0.98]"
             >
-              Review {weakCount} weak card{weakCount > 1 ? "s" : ""}
+              Review {incorrectCount} review cards
             </button>
             <p className="text-center text-xs text-gray-500 dark:text-gray-400">
-              Practice what you just missed
+              Focus on the cards you just missed
             </p>
           </div>
-        ) : null}
-        <div className="flex gap-3">
+        ) : (
           <button
             type="button"
             disabled={isRestarting}
             onClick={handleRestart}
             className={[
-              "flex-1 rounded-xl bg-black py-3 text-center text-sm font-medium text-white transition-all duration-150 hover:scale-[1.02] hover:opacity-90 active:scale-[0.98] dark:bg-white dark:text-black",
+              "w-full rounded-xl bg-black py-3.5 text-center text-sm font-semibold text-white transition-all duration-150 hover:scale-[1.02] hover:opacity-90 active:scale-[0.98] dark:bg-white dark:text-black",
               isRestarting ? "opacity-70" : "",
             ].join(" ")}
           >
-            Try Again
+            Start New Challenge
           </button>
+        )}
+        <div className="flex gap-3">
           <button
             type="button"
             onClick={onExit}
-            className="flex-1 rounded-xl border border-gray-200 bg-gray-50 py-3 text-center text-sm font-medium text-gray-900 transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+            className="w-full rounded-xl border border-gray-200 bg-gray-50 py-3 text-center text-sm font-medium text-gray-900 transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
           >
             Back to Notes
           </button>

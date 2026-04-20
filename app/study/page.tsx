@@ -29,6 +29,8 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { saveChallengeSession } from "@/lib/repositories/challengeSessionsRepository";
 import { DEFAULT_CHALLENGE_SESSION_MODE } from "@/features/challengeSessions/constants";
 
+type SessionType = "challenge" | "review";
+
 function StudyPage() {
   const [isNotesOpen, setIsNotesOpen] = useState(true);
   const [mode, setMode] = useState<"flashcards" | "challenge" | null>(null);
@@ -37,10 +39,14 @@ function StudyPage() {
   );
   const [isChallengeGenerating, setIsChallengeGenerating] = useState(false);
   const [focusWeakCards, setFocusWeakCards] = useState(false);
+  const [sessionType, setSessionType] = useState<SessionType>("challenge");
+  const [previousPerformance, setPreviousPerformance] = useState<{
+    previousCorrect: number;
+    previousTotal: number;
+  } | null>(null);
   const [challengeSessionResults, setChallengeSessionResults] = useState<
     Record<string, ChallengeAnswerResult>
   >({});
-  const [isReviewChallengeSession, setIsReviewChallengeSession] = useState(false);
   const searchParams = useSearchParams();
   const router = useRouter();
   const { showToast } = useToast();
@@ -146,7 +152,7 @@ const {
     ],
   );
 
-  const challengeWeakFlashcardIds = useMemo(() => {
+  const challengeReviewFlashcardIds = useMemo(() => {
     if (!challengeQuiz.isComplete || challengeQuestions.length === 0) {
       return [];
     }
@@ -229,18 +235,16 @@ const handleResetMode = () => {
   setChallengeQuestions([]);
   setIsChallengeGenerating(false);
   setChallengeSessionResults({});
-  setIsReviewChallengeSession(false);
+  setSessionType("challenge");
+  setPreviousPerformance(null);
   resetMode();
 };
 
 type PrepareChallengeFromCardsOptions = {
   /** When true, always pass focusWeakCards to generation (overrides mode toggle). */
   forceFocusWeakCards?: boolean;
-  /** Marks the session as started from “Review weak cards” (summary copy + UI). */
-  fromReview?: boolean;
+  sessionType?: SessionType;
 };
-
-const MIN_REVIEW_SESSION_CARDS = 3;
 
 const prepareChallengeFromCards = useCallback(
   async (cards: Flashcard[], opts?: PrepareChallengeFromCardsOptions) => {
@@ -248,7 +252,11 @@ const prepareChallengeFromCards = useCallback(
     setChallengeSessionResults({});
     challengeSessionSavedRef.current = false;
     setMode("challenge");
-    setIsReviewChallengeSession(opts?.fromReview === true);
+    const nextSessionType = opts?.sessionType ?? "challenge";
+    setSessionType(nextSessionType);
+    if (nextSessionType === "challenge") {
+      setPreviousPerformance(null);
+    }
 
     const focusForGeneration =
       opts?.forceFocusWeakCards === true ? true : focusWeakCards;
@@ -262,7 +270,6 @@ const prepareChallengeFromCards = useCallback(
         "error",
       );
       setMode(null);
-      setIsReviewChallengeSession(false);
       return false;
     }
     setChallengeQuestions(mapped);
@@ -271,55 +278,43 @@ const prepareChallengeFromCards = useCallback(
   [user?.uid, focusWeakCards, showToast],
 );
 
-const handleReviewWeakCards = useCallback(async () => {
-  const weakIdSet = new Set(
-    challengeWeakFlashcardIds.map((id) => id.trim()).filter(Boolean),
+const handleReviewCards = useCallback(async () => {
+  const reviewIdSet = new Set(
+    challengeReviewFlashcardIds.map((id) => id.trim()).filter(Boolean),
   );
-  const weakCards = flashcards.filter((c) => {
+  const reviewCards = flashcards.filter((c) => {
     const id = c.id?.trim();
     if (!id) return false;
-    return weakIdSet.has(id);
+    return reviewIdSet.has(id);
   });
-  if (weakCards.length === 0) {
+  if (reviewCards.length === 0) {
     showToast("No missed cards to review.", "info");
     return;
   }
-
-  let finalCards = [...weakCards];
-  if (finalCards.length < MIN_REVIEW_SESSION_CARDS) {
-    const need = MIN_REVIEW_SESSION_CARDS - finalCards.length;
-    const used = new Set<string>();
-    for (const c of finalCards) {
-      const id = c.id?.trim();
-      if (id) used.add(id);
-    }
-    // Top up from the rest of the deck (not in this session’s weak set) so short misses still get a viable session.
-    const extras = flashcards.filter((c) => {
-      const id = c.id?.trim();
-      if (!id || used.has(id) || weakIdSet.has(id)) return false;
-      return true;
-    });
-    finalCards = [...finalCards, ...extras.slice(0, need)];
-  }
+  setPreviousPerformance({
+    previousCorrect: challengeQuiz.correctCount,
+    previousTotal: challengeQuestions.length,
+  });
 
   setStudyLoadingOverlay(true, "Preparing challenge...");
   setIsChallengeGenerating(true);
   try {
-    await prepareChallengeFromCards(finalCards, {
+    await prepareChallengeFromCards(reviewCards, {
       forceFocusWeakCards: true,
-      fromReview: true,
+      sessionType: "review",
     });
   } catch {
     showToast("Could not prepare challenge. Try again.", "error");
     setMode(null);
     setChallengeQuestions([]);
-    setIsReviewChallengeSession(false);
   } finally {
     setStudyLoadingOverlay(false);
     setIsChallengeGenerating(false);
   }
 }, [
-  challengeWeakFlashcardIds,
+  challengeReviewFlashcardIds,
+  challengeQuiz.correctCount,
+  challengeQuestions.length,
   flashcards,
   prepareChallengeFromCards,
   showToast,
@@ -356,7 +351,7 @@ const handleChallenge = async () => {
     setStudyLoadingOverlay(true, "Preparing challenge...");
     setIsChallengeGenerating(true);
     try {
-      await prepareChallengeFromCards(cards);
+      await prepareChallengeFromCards(cards, { sessionType: "challenge" });
     } catch {
       showToast("Could not prepare challenge. Try again.", "error");
       setMode(null);
@@ -441,10 +436,13 @@ const handleChallenge = async () => {
           correctCount={challengeQuiz.correctCount}
           streak={challengeQuiz.streak}
           isComplete={challengeQuiz.isComplete}
-          focusWeakCards={focusWeakCards || isReviewChallengeSession}
-          isReviewSession={isReviewChallengeSession}
-          weakFlashcardIds={challengeWeakFlashcardIds}
-          onReviewWeakCards={handleReviewWeakCards}
+          focusWeakCards={focusWeakCards}
+          sessionType={sessionType}
+          answerResultsByFlashcardId={challengeSessionResults}
+          previousPerformance={previousPerformance}
+          reviewFlashcardIds={challengeReviewFlashcardIds}
+          onReviewCards={handleReviewCards}
+          onContinueChallenge={handleChallenge}
           onRevealAnswer={challengeQuiz.revealAnswer}
           onAnswer={handleChallengeAnswer}
           onRestartChallenge={handleChallenge}
