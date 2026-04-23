@@ -12,6 +12,8 @@ type UpdateFlashcardStatsInput = {
   flashcardId: string;
   isCorrect: boolean;
   mode: FlashcardStatsMode;
+  /** Passed through to Firestore read/write tracing (e.g. "FlashcardMode|markCard"). */
+  debugContext?: string;
 };
 
 /**
@@ -27,8 +29,11 @@ export async function updateFlashcardStats(
 
   try {
     const weight = input.mode === "study" ? 1 : 0.5;
+    const ctx =
+      input.debugContext ??
+      `user_flashcard_stats|updateFlashcardStats|mode:${input.mode}`;
 
-    const existing = await getUserFlashcardStat(userId, flashcardId);
+    const existing = await getUserFlashcardStat(userId, flashcardId, ctx);
 
     let correctCount = existing?.correctCount ?? 0;
     let incorrectCount = existing?.incorrectCount ?? 0;
@@ -42,14 +47,17 @@ export async function updateFlashcardStats(
       streak = 0;
     }
 
-    await saveUserFlashcardStat({
-      userId,
-      flashcardId,
-      correctCount,
-      incorrectCount,
-      streak,
-      lastResult: input.isCorrect ? "correct" : "incorrect",
-    });
+    await saveUserFlashcardStat(
+      {
+        userId,
+        flashcardId,
+        correctCount,
+        incorrectCount,
+        streak,
+        lastResult: input.isCorrect ? "correct" : "incorrect",
+      },
+      ctx,
+    );
   } catch (e) {
     console.warn("[updateFlashcardStats] failed", e);
   }

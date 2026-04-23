@@ -47,7 +47,11 @@ export async function buildDifficultyByFlashcardId(
         out[id] = "medium";
         return;
       }
-      const stat = await getUserFlashcardStat(uid, id);
+      const stat = await getUserFlashcardStat(
+        uid,
+        id,
+        "ChallengeMode|mcqDifficulty|user_flashcard_stats",
+      );
       const conf = confidenceFromUserFlashcardStat(stat);
       out[id] = getDifficultyFromConfidence(conf);
     }),

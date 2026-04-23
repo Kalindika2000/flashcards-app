@@ -9,9 +9,12 @@ import { mapFlashcardsToChallengeQuestions } from "@/features/study/utils/mapFla
 import { normalizeOptionFormat } from "@/features/study/utils/normalizeOptionFormat";
 import {
   attachStats,
+  buildWeakOrderedInDeck,
   selectFlashcardsForChallengeSession,
   stripConfidence,
+  type FlashcardWithConfidence,
 } from "@/features/study/utils/challengeFlashcardSelection";
+import { getWeakCards } from "@/lib/userCardStats";
 import { buildDifficultyByFlashcardId } from "@/features/study/utils/mcqDifficulty";
 import { prefetchDefinitionMisconceptionsForChallenge } from "@/features/study/utils/prefetchDefinitionMisconceptions";
 
@@ -45,11 +48,30 @@ export async function generateChallengeQuestions(
   options?: ChallengeOptions,
 ): Promise<ChallengeQuestion[]> {
   const flashcardsWithStats = await attachStats(flashcards, userId);
-  const selectedWithStats = selectFlashcardsForChallengeSession(
-    flashcardsWithStats,
-    flashcards,
-    options,
-  );
+
+  let selectedWithStats: FlashcardWithConfidence[];
+  if (options?.focusWeakCards === true && userId?.trim()) {
+    const weakSorted = await getWeakCards(
+      userId.trim(),
+      "ChallengeMode|WeakCards|user_card_stats|generateQuestions",
+    );
+    const picked = buildWeakOrderedInDeck(flashcardsWithStats, weakSorted);
+    console.log("Weak selection output:", picked);
+    console.log("Returned from weak selection");
+    if (picked.length > 0) {
+      selectedWithStats = picked;
+      console.log("Using weak-only mode. Cards:", picked.length);
+    } else {
+      console.warn("No weak cards found — returning empty set");
+      selectedWithStats = [];
+    }
+  } else {
+    selectedWithStats = selectFlashcardsForChallengeSession(
+      flashcardsWithStats,
+      flashcards,
+      options,
+    );
+  }
   const selectedFlashcards = selectedWithStats.map(stripConfidence);
 
   const difficultyByFlashcardId = await buildDifficultyByFlashcardId(
@@ -68,7 +90,7 @@ export async function generateChallengeQuestions(
     difficultyByFlashcardId,
   });
 
-  return Promise.all(
+  const result = await Promise.all(
     base.map(async (q) => {
       const difficulty = difficultyByFlashcardId[q.flashcardId] ?? "medium";
 
@@ -102,4 +124,6 @@ export async function generateChallengeQuestions(
       };
     }),
   );
+  console.log("generateChallengeQuestions returning:", result);
+  return result;
 }

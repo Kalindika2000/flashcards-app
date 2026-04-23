@@ -8,39 +8,13 @@ import type {
 } from "@/features/study/types/challengeQuestion";
 import ChallengeSummary from "@/components/study/ChallengeSummary";
 import { QuestionRenderer } from "@/components/study/QuestionRenderer";
+import { useAuth } from "@/components/auth/AuthProvider";
+import { getHints } from "@/lib/hintService";
+import { updateCardStats } from "@/lib/userCardStats";
 
 /** Fade current card shortly before auto-advance (matches hook delay tail). */
 const TRANSITION_OUT_DELAY_MS = 600;
 const RECOVERY_FEEDBACK_MS = 1200;
-
-function buildHint(answer: string, level: 1 | 2): string {
-  const trimmed = answer.trim();
-  if (!trimmed) return "Try recalling the key idea first.";
-
-  const words = trimmed.split(/\s+/).filter(Boolean);
-  if (level === 1) {
-    if (words.length >= 1) {
-      const first = words[0] ?? "";
-      if (first.length <= 3) return `${first[0] ?? ""}…`;
-      return `${first.slice(0, Math.min(3, first.length))}…`;
-    }
-    if (trimmed.length <= 4) return `${trimmed[0] ?? ""}…`;
-    if (trimmed.length <= 10) return `${trimmed.slice(0, 2)}…`;
-    return `${trimmed.slice(0, 4)}…`;
-  }
-
-  if (words.length >= 2) {
-    const first = words[0] ?? "";
-    const second = words[1] ?? "";
-    return `${first.slice(0, Math.min(5, first.length))}… ${second.slice(0, Math.min(4, second.length))}…`;
-  }
-  if (words.length === 1) {
-    const only = words[0] ?? "";
-    return `${only.slice(0, Math.min(6, only.length))}…`;
-  }
-  if (trimmed.length <= 8) return `${trimmed.slice(0, Math.min(4, trimmed.length))}…`;
-  return `${trimmed.slice(0, Math.min(8, trimmed.length))}…`;
-}
 
 type StudyChallengeSessionProps = {
   questions: ChallengeQuestion[];
@@ -52,6 +26,7 @@ type StudyChallengeSessionProps = {
   isComplete: boolean;
   sessionType?: "challenge" | "review";
   answerResultsByFlashcardId?: Record<string, ChallengeAnswerResult>;
+  reviewIncorrectCountsByFlashcardId?: Record<string, number>;
   previousPerformance?: {
     previousCorrect: number;
     previousTotal: number;
@@ -77,6 +52,7 @@ export default function StudyChallengeSession({
   isComplete,
   sessionType = "challenge",
   answerResultsByFlashcardId = {},
+  reviewIncorrectCountsByFlashcardId = {},
   previousPerformance,
   focusWeakCards = false,
   reviewFlashcardIds = [],
@@ -87,6 +63,7 @@ export default function StudyChallengeSession({
   onRestartChallenge,
   onBackToModes,
 }: StudyChallengeSessionProps) {
+  const { user } = useAuth();
   const total = questions.length;
   const current = questions[currentQuestionIndex];
   const [cardAttemptCounts, setCardAttemptCounts] = useState<Record<string, number>>(
@@ -101,11 +78,19 @@ export default function StudyChallengeSession({
   const [hintAnswerRevealedByCard, setHintAnswerRevealedByCard] = useState<
     Record<string, boolean>
   >({});
+  const [hintsByCard, setHintsByCard] = useState<Record<string, string[]>>({});
+  const [hintVisibleByCard, setHintVisibleByCard] = useState<Record<string, boolean>>(
+    {},
+  );
+  const [hintDismissedByCard, setHintDismissedByCard] = useState<
+    Record<string, boolean>
+  >({});
   const [showRecoveryForCardId, setShowRecoveryForCardId] = useState<string | null>(null);
 
   const [isTransitioning, setIsTransitioning] = useState(false);
   const transitionOutTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const recoveryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hintHideTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   useEffect(() => {
     setIsTransitioning(false);
@@ -123,6 +108,9 @@ export default function StudyChallengeSession({
       ...prev,
       [id]: (prev[id] ?? 0) + 1,
     }));
+    // When a card is shown, allow hint UI to render again for this card.
+    setHintVisibleByCard((prev) => ({ ...prev, [id]: true }));
+    setHintDismissedByCard((prev) => ({ ...prev, [id]: false }));
   }, [current?.flashcardId, isComplete]);
 
   // Reset hint-related UI and per-card counters for each new session payload.
@@ -131,7 +119,30 @@ export default function StudyChallengeSession({
     setCardIncorrectCounts({});
     setHintRevealedByCard({});
     setHintAnswerRevealedByCard({});
+    setHintVisibleByCard({});
+    setHintDismissedByCard({});
+    for (const timer of Object.values(hintHideTimersRef.current)) {
+      clearTimeout(timer);
+    }
+    hintHideTimersRef.current = {};
   }, [questions]);
+
+  useEffect(() => {
+    const id = current?.flashcardId?.trim() ?? "";
+    if (!id || !current) return;
+    if (hintsByCard[id]) return;
+    let cancelled = false;
+    void getHints(current.question, current.answer).then((hints) => {
+      if (cancelled) return;
+      setHintsByCard((prev) => {
+        if (prev[id]) return prev;
+        return { ...prev, [id]: hints };
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [current, hintsByCard]);
 
   useEffect(() => {
     return () => {
@@ -141,17 +152,45 @@ export default function StudyChallengeSession({
       if (recoveryTimerRef.current) {
         clearTimeout(recoveryTimerRef.current);
       }
+      for (const timer of Object.values(hintHideTimersRef.current)) {
+        clearTimeout(timer);
+      }
     };
   }, []);
+
+  const hideHintWithFade = useCallback((flashcardId: string) => {
+    const id = flashcardId.trim();
+    if (!id) return;
+    setHintVisibleByCard((prev) => ({ ...prev, [id]: false }));
+    if (hintHideTimersRef.current[id]) {
+      clearTimeout(hintHideTimersRef.current[id]);
+    }
+    hintHideTimersRef.current[id] = setTimeout(() => {
+      setHintDismissedByCard((prev) => ({ ...prev, [id]: true }));
+      setHintRevealedByCard((prev) => ({ ...prev, [id]: false }));
+      setHintAnswerRevealedByCard((prev) => ({ ...prev, [id]: false }));
+      delete hintHideTimersRef.current[id];
+    }, 200);
+  }, []);
+
+  const handleRevealWithHintHide = useCallback(() => {
+    const id = current?.flashcardId?.trim();
+    if (id) hideHintWithFade(id);
+    onRevealAnswer();
+  }, [current?.flashcardId, hideHintWithFade, onRevealAnswer]);
 
   const handleAnswerWithTransition = useCallback(
     (result: ChallengeAnswerResult) => {
       const id = current?.flashcardId?.trim();
+      const usedHint = Boolean(id && hintRevealedByCard[id]);
       if (id && result === "incorrect") {
         setCardIncorrectCounts((prev) => ({
           ...prev,
           [id]: (prev[id] ?? 0) + 1,
         }));
+      }
+      if (id) {
+        hideHintWithFade(id);
       }
       if (id && result === "correct" && (cardIncorrectCounts[id] ?? 0) >= 2) {
         setShowRecoveryForCardId(id);
@@ -164,6 +203,24 @@ export default function StudyChallengeSession({
         }, RECOVERY_FEEDBACK_MS);
       }
       onAnswer(result);
+      if (user?.uid && id) {
+        void (async () => {
+          try {
+            await updateCardStats({
+              userId: user.uid,
+              cardId: id,
+              isCorrect: result === "correct",
+              usedHint,
+              debugContext:
+                sessionType === "review"
+                  ? "ChallengeMode|Review|answer|user_card_stats"
+                  : "ChallengeMode|Challenge|answer|user_card_stats",
+            });
+          } catch (err) {
+            console.error("[StudyChallengeSession] updateCardStats", err);
+          }
+        })();
+      }
       if (transitionOutTimerRef.current) {
         clearTimeout(transitionOutTimerRef.current);
       }
@@ -172,7 +229,15 @@ export default function StudyChallengeSession({
         transitionOutTimerRef.current = null;
       }, TRANSITION_OUT_DELAY_MS);
     },
-    [cardIncorrectCounts, current?.flashcardId, onAnswer],
+    [
+      cardIncorrectCounts,
+      current?.flashcardId,
+      hideHintWithFade,
+      hintRevealedByCard,
+      onAnswer,
+      sessionType,
+      user?.uid,
+    ],
   );
 
   const totalIncorrect = reviewFlashcardIds.length;
@@ -184,8 +249,16 @@ export default function StudyChallengeSession({
       ? answerResultsByFlashcardId[currentFlashcardId]
       : undefined;
   const currentIncorrectCount =
-    currentFlashcardId.length > 0 ? (cardIncorrectCounts[currentFlashcardId] ?? 0) : 0;
-  const hintLevel: 1 | 2 = currentIncorrectCount >= 3 ? 2 : 1;
+    currentFlashcardId.length > 0
+      ? Math.max(
+          cardIncorrectCounts[currentFlashcardId] ?? 0,
+          reviewIncorrectCountsByFlashcardId[currentFlashcardId] ?? 0,
+        )
+      : 0;
+  const hintThreshold = 2;
+  const hints = hintsByCard[currentFlashcardId] ?? [];
+  const hintIndex = Math.min(Math.max(currentIncorrectCount - hintThreshold, 0), 3);
+  const hint = hints[hintIndex];
   const canRevealFullAnswer = currentIncorrectCount >= 4;
   const hintAlreadyShown =
     currentFlashcardId.length > 0
@@ -194,20 +267,22 @@ export default function StudyChallengeSession({
   const shouldShowHintPrompt =
     !isComplete &&
     sessionType === "review" &&
-    currentResult === "incorrect" &&
     currentIncorrectCount >= 2 &&
     !hintAlreadyShown &&
     currentFlashcardId.length > 0;
   const shouldShowPartialHint =
     !isComplete &&
     sessionType === "review" &&
-    currentResult === "incorrect" &&
     currentFlashcardId.length > 0 &&
     Boolean(hintRevealedByCard[currentFlashcardId]);
   const shouldShowHintAnswer =
     shouldShowPartialHint &&
     currentFlashcardId.length > 0 &&
     Boolean(hintAnswerRevealedByCard[currentFlashcardId]);
+  const isHintVisible =
+    currentFlashcardId.length > 0 ? hintVisibleByCard[currentFlashcardId] !== false : true;
+  const isHintDismissed =
+    currentFlashcardId.length > 0 ? Boolean(hintDismissedByCard[currentFlashcardId]) : false;
   const showRecoveryFeedback =
     !isComplete &&
     sessionType === "review" &&
@@ -309,7 +384,7 @@ export default function StudyChallengeSession({
               <QuestionRenderer
                 question={current}
                 revealed={answerRevealed}
-                onReveal={onRevealAnswer}
+                onReveal={handleRevealWithHintHide}
                 onAnswer={handleAnswerWithTransition}
               />
             </div>
@@ -319,8 +394,13 @@ export default function StudyChallengeSession({
               🎯 Focusing on cards you need to improve
             </p>
           ) : null}
-          {shouldShowHintPrompt ? (
-            <div className="mt-2 flex flex-col items-center gap-2">
+          {shouldShowHintPrompt && !isHintDismissed ? (
+            <div
+              className={[
+                "mt-2 flex flex-col items-center gap-2 transition-opacity duration-200",
+                isHintVisible ? "opacity-100" : "opacity-0",
+              ].join(" ")}
+            >
               <p className="text-center text-xs text-gray-500 dark:text-gray-400">
                 {currentIncorrectCount === 2
                   ? "This one&apos;s a bit tricky — want a hint?"
@@ -341,10 +421,15 @@ export default function StudyChallengeSession({
               </button>
             </div>
           ) : null}
-          {shouldShowPartialHint && current ? (
-            <div className="mt-2 flex flex-col items-center gap-2">
+          {shouldShowPartialHint && current && !isHintDismissed && hint ? (
+            <div
+              className={[
+                "mt-2 flex flex-col items-center gap-2 transition-opacity duration-200",
+                isHintVisible ? "opacity-100" : "opacity-0",
+              ].join(" ")}
+            >
               <p className="text-center text-xs text-gray-500 dark:text-gray-400">
-                Here&apos;s a clue: {buildHint(current.answer, hintLevel)}
+                Here&apos;s a clue: {hint}
               </p>
               {!shouldShowHintAnswer && canRevealFullAnswer ? (
                 <button

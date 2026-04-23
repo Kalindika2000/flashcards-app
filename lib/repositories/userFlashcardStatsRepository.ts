@@ -1,5 +1,6 @@
 import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { logStatsUsage } from "@/lib/debugStatsUsage";
 import type {
   SaveUserFlashcardStatInput,
   UserFlashcardStatDoc,
@@ -28,6 +29,7 @@ function parseLastResult(
 export async function getUserFlashcardStat(
   userId: string,
   flashcardId: string,
+  debugContext = "user_flashcard_stats|getUserFlashcardStat",
 ): Promise<UserFlashcardStatDoc | null> {
   const uid = userId.trim();
   const fid = flashcardId.trim();
@@ -35,12 +37,22 @@ export async function getUserFlashcardStat(
 
   const ref = doc(db, COLLECTION, userFlashcardStatDocId(uid, fid));
   const snap = await getDoc(ref);
-  if (!snap.exists()) return null;
+  if (!snap.exists()) {
+    logStatsUsage("READ", COLLECTION, debugContext, {
+      op: "getDoc",
+      docId: userFlashcardStatDocId(uid, fid),
+      userId: uid,
+      flashcardId: fid,
+      exists: false,
+      results: null,
+    });
+    return null;
+  }
 
   const d = snap.data() as Record<string, unknown>;
   const lastResult = parseLastResult(d.lastResult);
 
-  return {
+  const parsed: UserFlashcardStatDoc = {
     userId: typeof d.userId === "string" ? d.userId : uid,
     flashcardId: typeof d.flashcardId === "string" ? d.flashcardId : fid,
     correctCount: typeof d.correctCount === "number" ? d.correctCount : 0,
@@ -49,6 +61,17 @@ export async function getUserFlashcardStat(
     lastResult: lastResult ?? "incorrect",
     lastSeenAt: d.lastSeenAt,
   };
+
+  logStatsUsage("READ", COLLECTION, debugContext, {
+    op: "getDoc",
+    docId: userFlashcardStatDocId(uid, fid),
+    userId: uid,
+    flashcardId: fid,
+    exists: true,
+    results: parsed,
+  });
+
+  return parsed;
 }
 
 /**
@@ -56,6 +79,7 @@ export async function getUserFlashcardStat(
  */
 export async function saveUserFlashcardStat(
   stat: SaveUserFlashcardStatInput,
+  debugContext = "user_flashcard_stats|saveUserFlashcardStat",
 ): Promise<void> {
   const uid = stat.userId?.trim();
   const fid = stat.flashcardId?.trim();
@@ -65,17 +89,28 @@ export async function saveUserFlashcardStat(
   }
 
   const ref = doc(db, COLLECTION, userFlashcardStatDocId(uid, fid));
-  await setDoc(
-    ref,
-    {
+  const data = {
+    userId: uid,
+    flashcardId: fid,
+    correctCount: stat.correctCount,
+    incorrectCount: stat.incorrectCount,
+    streak: stat.streak,
+    lastResult: stat.lastResult,
+    lastSeenAt: stat.lastSeenAt ?? serverTimestamp(),
+  };
+  logStatsUsage("WRITE", COLLECTION, debugContext, {
+    op: "setDoc(merge)",
+    userId: uid,
+    flashcardId: fid,
+    data: {
       userId: uid,
       flashcardId: fid,
       correctCount: stat.correctCount,
       incorrectCount: stat.incorrectCount,
       streak: stat.streak,
       lastResult: stat.lastResult,
-      lastSeenAt: stat.lastSeenAt ?? serverTimestamp(),
+      lastSeenAt: stat.lastSeenAt != null ? stat.lastSeenAt : "[serverTimestamp]",
     },
-    { merge: true },
-  );
+  });
+  await setDoc(ref, data, { merge: true });
 }

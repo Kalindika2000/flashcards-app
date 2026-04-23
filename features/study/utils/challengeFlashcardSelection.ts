@@ -1,6 +1,7 @@
 import type { Flashcard } from "@/features/study/types/flashcard";
 import { shuffle } from "@/features/study/utils/generateMultipleChoiceOptions";
 import { getUserFlashcardStat } from "@/lib/repositories/userFlashcardStatsRepository";
+import type { WeakCardEntry } from "@/lib/userCardStats";
 
 export type FlashcardWithConfidence = Flashcard & {
   confidence: number;
@@ -85,7 +86,11 @@ export async function attachStats(
           lastSeenAt: null,
         };
       }
-      const stat = await getUserFlashcardStat(uid, id);
+      const stat = await getUserFlashcardStat(
+        uid,
+        id,
+        "ChallengeMode|attachStats|user_flashcard_stats",
+      );
       if (!stat) {
         return {
           ...card,
@@ -167,6 +172,183 @@ function dedupeCombinedSessionOrder(
   return out;
 }
 
+/**
+ * Resolves weak stats rows to in-deck flashcards (weakness order preserved, ids deduped).
+ */
+function buildWeakOrderedInDeck<T extends Flashcard>(
+  allCards: T[],
+  weakSorted: WeakCardEntry[],
+): T[] {
+  const weakOrderedRaw = weakSorted
+    .map((stat) => {
+      const statId = stat.cardId.trim();
+      if (!statId) return null;
+
+      let match = allCards.find((c) => c.id?.trim() === statId);
+      if (match) return match;
+
+      const lower = statId.toLowerCase();
+      match = allCards.find(
+        (c) => (c.id?.trim() ?? "").toLowerCase() === lower,
+      );
+      if (match) return match;
+
+      console.warn("Could not resolve weak card:", statId);
+      return null;
+    })
+    .filter((c): c is T => c != null);
+
+  const seenCanon = new Set<string>();
+  const weakOrderedInDeck: T[] = [];
+  for (const card of weakOrderedRaw) {
+    const canon = card.id?.trim();
+    if (!canon || seenCanon.has(canon)) continue;
+    seenCanon.add(canon);
+    weakOrderedInDeck.push(card);
+  }
+  console.log(
+    "weakOrderedInDeck length:",
+    weakOrderedInDeck.length,
+  );
+
+  console.log(
+    "allCards length:",
+    allCards.length,
+  );
+
+  console.log(
+    "weakOrderedInDeck IDs:",
+    weakOrderedInDeck.map((c) => c.id),
+  );
+
+  console.log(
+    "allCards IDs:",
+    allCards.map((c) => c.id),
+  );
+  console.log("Weak ordering executed in selection util");
+  return weakOrderedInDeck;
+}
+
+export { buildWeakOrderedInDeck };
+
+/**
+ * Picks up to `cap` cards using persistent weak stats: ~70% from cards whose ids appear
+ * in `weakSorted` (highest weakness first), the rest from others; fills shortfalls from
+ * the non-weak pool; final order is shuffled. Returns `null` when there is no applicable
+ * weak signal for this deck (caller should fall back to default selection).
+ */
+export function pickFlashcardsWithPersistentWeakPreference<T extends Flashcard>(
+  allCards: T[],
+  weakSorted: WeakCardEntry[],
+  cap: number,
+): T[] | null {
+  if (allCards.length === 0 || cap <= 0) {
+    return [];
+  }
+  if (!weakSorted.length) {
+    return null;
+  }
+
+  const n = allCards.length;
+  const effectiveCap = Math.min(cap, n);
+
+  const weakOrderedInDeck = buildWeakOrderedInDeck(allCards, weakSorted);
+
+  weakSorted.forEach((stat) => {
+    const match = allCards.find((c) => c.id === stat.cardId);
+    console.log("Resolving:", stat.cardId, "→", match);
+  });
+
+  console.log("weakOrderedInDeck:", weakOrderedInDeck);
+
+  /** Stat id + flashcard id so normal pool excludes all matched weak cards. */
+  const weakIdSet = new Set<string>();
+  for (const w of weakSorted) {
+    const sid = w.cardId.trim();
+    if (sid) weakIdSet.add(sid);
+  }
+  for (const card of weakOrderedInDeck) {
+    const cid = card.id?.trim();
+    if (cid) weakIdSet.add(cid);
+  }
+
+  console.log(
+    "[WeakCards] weak card IDs (stats):",
+    weakSorted.map((c) => c.cardId.trim()).filter(Boolean),
+  );
+  console.log(
+    "[WeakCards] all flashcard IDs:",
+    allCards.map((c) => c.id?.trim() ?? ""),
+  );
+  console.log("[WeakCards] matched weak flashcards:", weakOrderedInDeck);
+
+  if (weakSorted.length > 0 && weakOrderedInDeck.length === 0) {
+    console.warn("Weak cards exist but none could be resolved");
+  }
+
+  const weakFlashcards = shuffle([...weakOrderedInDeck]);
+  const normalFlashcards = shuffle(
+    allCards.filter((c) => {
+      const id = c.id?.trim();
+      return !id || !weakIdSet.has(id);
+    }),
+  );
+
+  const weakCount = Math.ceil(effectiveCap * 0.7);
+  const normalCount = effectiveCap - weakCount;
+
+  const fromWeak = weakFlashcards.slice(0, weakCount);
+  const shortfall = weakCount - fromWeak.length;
+  const fromNormal = normalFlashcards.slice(0, normalCount + shortfall);
+
+  let selected = [...fromWeak, ...fromNormal];
+  const seenKeys = new Set(selected.map((c) => dedupeKey(c)));
+
+  for (const c of shuffle([...allCards])) {
+    if (selected.length >= effectiveCap) break;
+    const k = dedupeKey(c);
+    if (seenKeys.has(k)) continue;
+    selected.push(c);
+    seenKeys.add(k);
+  }
+
+  if (selected.length > effectiveCap) {
+    selected = selected.slice(0, effectiveCap);
+  }
+
+  return shuffle(selected);
+}
+
+/** Maps a weak-prioritized card list back to indices into the original `cards` array. */
+export function orderFlashcardIndicesByWeakStats(
+  cards: Flashcard[],
+  weakSorted: WeakCardEntry[],
+): number[] | null {
+  const picked = pickFlashcardsWithPersistentWeakPreference(
+    cards,
+    weakSorted,
+    cards.length,
+  );
+  if (!picked) {
+    return null;
+  }
+  const used = new Set<number>();
+  const indices: number[] = [];
+  for (const p of picked) {
+    const idx = cards.findIndex((c, i) => !used.has(i) && c === p);
+    if (idx >= 0) {
+      used.add(idx);
+      indices.push(idx);
+    }
+  }
+  for (let i = 0; i < cards.length; i++) {
+    if (!used.has(i)) {
+      indices.push(i);
+    }
+  }
+  return indices;
+}
+
 function fillToCap(
   deduped: FlashcardWithConfidence[],
   seen: Set<string>,
@@ -201,14 +383,13 @@ function fillToCap(
 
 /**
  * Up to {@link CHALLENGE_SESSION_SIZE} cards: mostly weakness-weighted, plus random variety.
- * With `focusWeakCards` and `cap < n`, uses ~85% weighted (weak/recency) and ~15% random slots.
- * If every card already has confidence > 0.8, weak-focus is skipped and the default 70/30 mix
- * applies so sessions stay varied when there is little separation in the deck.
+ * Persistent weak focus (toggle) is handled in {@link generateChallengeQuestions} via
+ * {@link pickFlashcardsWithPersistentWeakPreference}; this path stays the default mix.
  */
 export function selectFlashcardsForChallengeSession(
   flashcardsWithStats: FlashcardWithConfidence[],
   originalOrder: Flashcard[],
-  options?: { focusWeakCards?: boolean },
+  _options?: { focusWeakCards?: boolean },
 ): FlashcardWithConfidence[] {
   const n = originalOrder.length;
   if (n === 0) return [];
@@ -222,19 +403,8 @@ export function selectFlashcardsForChallengeSession(
     return fillToCap(deduped, seen, cap, prioritized, flashcardsWithStats);
   }
 
-  const allHighConfidence = flashcardsWithStats.every((c) => c.confidence > 0.8);
-  const useWeakFocusLayout =
-    options?.focusWeakCards === true && cap < n && !allHighConfidence;
-
-  let priorityTake: number;
-  let randomTarget: number;
-  if (useWeakFocusLayout) {
-    priorityTake = Math.floor(cap * 0.85);
-    randomTarget = cap - priorityTake;
-  } else {
-    priorityTake = Math.min(PRIORITY_SLOT_COUNT, cap);
-    randomTarget = Math.min(RANDOM_SLOT_COUNT, cap - priorityTake);
-  }
+  const priorityTake = Math.min(PRIORITY_SLOT_COUNT, cap);
+  const randomTarget = Math.min(RANDOM_SLOT_COUNT, cap - priorityTake);
 
   const priorityPick = prioritized.slice(0, priorityTake);
 

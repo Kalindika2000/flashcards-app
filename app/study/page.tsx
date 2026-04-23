@@ -21,6 +21,11 @@ import { useStudyChallengeSession } from "@/features/study/hooks/useStudyChallen
 import { useFlashcardSession } from "@/features/study/hooks/useFlashcardSession";
 import { useStudyData } from "@/features/study/hooks/useStudyData";
 import { generateChallengeQuestions } from "@/features/study/utils/generateChallengeQuestions";
+import {
+  buildWeakOrderedInDeck,
+  orderFlashcardIndicesByWeakStats,
+} from "@/features/study/utils/challengeFlashcardSelection";
+import { getWeakCards } from "@/lib/userCardStats";
 import type { ChallengeAnswerResult, ChallengeQuestion } from "@/features/study/types/challengeQuestion";
 import type { Flashcard } from "@/features/study/types/flashcard";
 import { updateFlashcardStats } from "@/lib/services/updateFlashcardStats";
@@ -30,6 +35,7 @@ import { saveChallengeSession } from "@/lib/repositories/challengeSessionsReposi
 import { DEFAULT_CHALLENGE_SESSION_MODE } from "@/features/challengeSessions/constants";
 
 type SessionType = "challenge" | "review";
+const DEBUG_CHALLENGE_LOGS = false;
 
 function StudyPage() {
   const [isNotesOpen, setIsNotesOpen] = useState(true);
@@ -47,6 +53,8 @@ function StudyPage() {
   const [challengeSessionResults, setChallengeSessionResults] = useState<
     Record<string, ChallengeAnswerResult>
   >({});
+  const [reviewIncorrectCountsByFlashcardId, setReviewIncorrectCountsByFlashcardId] =
+    useState<Record<string, number>>({});
   const searchParams = useSearchParams();
   const router = useRouter();
   const { showToast } = useToast();
@@ -63,6 +71,7 @@ function StudyPage() {
           flashcardId,
           isCorrect: isKnown,
           mode: "study",
+          debugContext: "FlashcardMode|markCard|user_flashcard_stats",
         });
       }
     },
@@ -86,6 +95,7 @@ function StudyPage() {
     mascotMood,
     mistakeCount,
     activeCards,
+    sessionCards,
     currentCard,
     someKnown,
     allMastered,
@@ -94,6 +104,7 @@ function StudyPage() {
     goPrev,
     restart,
     handleMarkCard,
+    setSessionCards,
   } = useFlashcardSession({
     onPersistMark: onPersistFlashcardMark,
   });
@@ -126,10 +137,16 @@ const {
           ...prev,
           [q.flashcardId]: result,
         }));
+        if (sessionType === "review" && result === "incorrect") {
+          setReviewIncorrectCountsByFlashcardId((prev) => ({
+            ...prev,
+            [q.flashcardId]: (prev[q.flashcardId] ?? 0) + 1,
+          }));
+        }
       }
       if (user?.uid && q?.flashcardId) {
-        if (process.env.NODE_ENV === "development") {
-          console.log("📊 Challenge stats update", {
+        if (DEBUG_CHALLENGE_LOGS) {
+          console.debug("📊 Challenge stats update", {
             flashcardId: q.flashcardId,
             isCorrect: result === "correct",
             mode: "challenge",
@@ -140,11 +157,16 @@ const {
           flashcardId: q.flashcardId,
           isCorrect: result === "correct",
           mode: "challenge",
+          debugContext:
+            sessionType === "review"
+              ? "ChallengeMode|Review|answer|user_flashcard_stats"
+              : "ChallengeMode|Challenge|answer|user_flashcard_stats",
         });
       }
       challengeHandleAnswer(result);
     },
     [
+      sessionType,
       challengeHandleAnswer,
       challengeQuiz.currentQuestionIndex,
       challengeQuestions,
@@ -200,12 +222,14 @@ const {
       totalQuestions: challengeQuestions.length,
     })
       .then(() => {
-        if (process.env.NODE_ENV === "development") {
-          console.log("[challenge_sessions] saved");
+        if (DEBUG_CHALLENGE_LOGS) {
+          console.debug("[challenge_sessions] saved");
         }
       })
       .catch((err) => {
-        console.warn("[challenge_sessions] save failed", err);
+        if (DEBUG_CHALLENGE_LOGS) {
+          console.debug("[challenge_sessions] save failed", err);
+        }
       });
   }, [
     mode,
@@ -225,16 +249,53 @@ const isOutdated =
   );
 
 const handleFlashcards = async () => {
+  console.log("Session initialization started");
   resetMode();
   setMode("flashcards");
 
-  await loadFlashcards();
+  const cards = await loadFlashcards();
+  if (cards?.length && focusWeakCards && user?.uid) {
+    try {
+      const weakSorted = await getWeakCards(
+        user.uid,
+        "FlashcardMode|WeakCards|user_card_stats|sessionOrder",
+      );
+      const weakOrderedInDeck = buildWeakOrderedInDeck(cards, weakSorted);
+      console.log("Returned from weak selection");
+      const indices = weakOrderedInDeck
+        .map((card) => cards.findIndex((c) => c === card))
+        .filter((i) => i !== -1);
+      if (indices.length > 0) {
+        setSessionCards(indices);
+        console.log("Applied sessionCards:", indices);
+      }
+      const indicesDebug = orderFlashcardIndicesByWeakStats(cards, weakSorted);
+      console.log("Weak order indices:", indicesDebug);
+      console.log("Indices length:", indicesDebug?.length);
+      console.log("Total cards length:", cards.length);
+      if (indices.length === 0 && indicesDebug && indicesDebug.length > 0) {
+        console.log("Calling setSessionCards with:", indicesDebug);
+        setSessionCards(indicesDebug);
+        console.log("Applied weak session cards:", indicesDebug);
+      } else if (indices.length === 0) {
+        console.log("sessionCards is empty, using fallback");
+      } else {
+        console.log("Calling setSessionCards with:", indices);
+        console.log("Applied weak session cards:", indices);
+      }
+    } catch (err) {
+      console.error("[study] weak flashcard order failed", err);
+    }
+  } else if (cards?.length) {
+    console.log("sessionCards is empty, using fallback");
+  }
 };
 const handleResetMode = () => {
   setMode(null);
   setChallengeQuestions([]);
   setIsChallengeGenerating(false);
   setChallengeSessionResults({});
+  setReviewIncorrectCountsByFlashcardId({});
   setSessionType("challenge");
   setPreviousPerformance(null);
   resetMode();
@@ -248,6 +309,7 @@ type PrepareChallengeFromCardsOptions = {
 
 const prepareChallengeFromCards = useCallback(
   async (cards: Flashcard[], opts?: PrepareChallengeFromCardsOptions) => {
+    console.log("Session initialization started");
     setChallengeQuestions([]);
     setChallengeSessionResults({});
     challengeSessionSavedRef.current = false;
@@ -256,6 +318,7 @@ const prepareChallengeFromCards = useCallback(
     setSessionType(nextSessionType);
     if (nextSessionType === "challenge") {
       setPreviousPerformance(null);
+      setReviewIncorrectCountsByFlashcardId({});
     }
 
     const focusForGeneration =
@@ -263,6 +326,23 @@ const prepareChallengeFromCards = useCallback(
 
     const mapped = await generateChallengeQuestions(cards, user?.uid, {
       focusWeakCards: focusForGeneration,
+    });
+    const indices = mapped
+      .map((q) => cards.findIndex((c) => c.question === q.question))
+      .filter((i) => i !== -1);
+
+    console.log("Final mapped indices:", indices);
+
+    if (indices.length > 0) {
+      setSessionCards(indices);
+      console.log("Applied sessionCards:", indices);
+    } else {
+      console.warn("No valid indices found — sessionCards not set");
+    }
+
+    mapped.forEach((q) => {
+      const match = cards.find((c) => c.question === q.question);
+      console.log("Mapping question → card:", q.question, "→", match?.id);
     });
     if (mapped.length === 0) {
       showToast(
@@ -366,6 +446,10 @@ const handleChallenge = async () => {
     setIsChallengeGenerating(false);
   }
 };
+
+  console.log("sessionCards type check:", sessionCards);
+  console.log("Selected cards before render:", sessionCards);
+
   return (
     <div
   className="app-container"
@@ -439,6 +523,7 @@ const handleChallenge = async () => {
           focusWeakCards={focusWeakCards}
           sessionType={sessionType}
           answerResultsByFlashcardId={challengeSessionResults}
+          reviewIncorrectCountsByFlashcardId={reviewIncorrectCountsByFlashcardId}
           previousPerformance={previousPerformance}
           reviewFlashcardIds={challengeReviewFlashcardIds}
           onReviewCards={handleReviewCards}
