@@ -468,6 +468,7 @@ export default function StudyChallengeSession({
           reviewFlashcardIds={reviewFlashcardIds}
           onReviewCards={onReviewCards}
           onRestart={onRestartChallenge}
+          onContinueChallenge={onContinueChallenge}
           onExit={onBackToModes}
         />
       )}

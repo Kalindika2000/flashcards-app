@@ -73,10 +73,6 @@ useEffect(() => {
     <div className="title">My Decks</div>
     <div className="subtitle">Organise your study</div>
   </div>
-
-  <div className="fab" onClick={() => setShowForm(true)}>
-  +
-</div>
 </div>
 
   <div className="search-wrapper">
@@ -179,6 +175,29 @@ useEffect(() => {
 </div>
 
 <BottomNav onAdd={() => setShowForm(true)} />
+
+      <button
+        type="button"
+        onClick={() => setShowForm(true)}
+        style={{
+          position: "fixed",
+          bottom: "80px",
+          right: "20px",
+          width: "56px",
+          height: "56px",
+          borderRadius: "50%",
+          backgroundColor: "#2563eb",
+          color: "white",
+          fontSize: "28px",
+          border: "none",
+          boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
+          cursor: "pointer",
+          zIndex: 1000,
+        }}
+        aria-label="Add deck"
+      >
+        +
+      </button>
 
 </div>
 );

@@ -302,7 +302,7 @@ const handleResetMode = () => {
 };
 
 type PrepareChallengeFromCardsOptions = {
-  /** When true, always pass focusWeakCards to generation (overrides mode toggle). */
+  /** When true, force weak focus on; when false, force off; when omitted, use mode toggle. */
   forceFocusWeakCards?: boolean;
   sessionType?: SessionType;
 };
@@ -321,8 +321,13 @@ const prepareChallengeFromCards = useCallback(
       setReviewIncorrectCountsByFlashcardId({});
     }
 
-    const focusForGeneration =
-      opts?.forceFocusWeakCards === true ? true : focusWeakCards;
+    let focusForGeneration = focusWeakCards;
+    if (opts?.forceFocusWeakCards === true) {
+      focusForGeneration = true;
+    }
+    if (opts?.forceFocusWeakCards === false) {
+      focusForGeneration = false;
+    }
 
     const mapped = await generateChallengeQuestions(cards, user?.uid, {
       focusWeakCards: focusForGeneration,
@@ -401,7 +406,9 @@ const handleReviewCards = useCallback(async () => {
   setStudyLoadingOverlay,
 ]);
 
-const handleChallenge = async () => {
+const runChallengeSession = async (
+  prepareOpts?: Pick<PrepareChallengeFromCardsOptions, "forceFocusWeakCards">,
+) => {
   if (!noteId) return;
 
   setIsSessionComplete(false);
@@ -431,7 +438,10 @@ const handleChallenge = async () => {
     setStudyLoadingOverlay(true, "Preparing challenge...");
     setIsChallengeGenerating(true);
     try {
-      await prepareChallengeFromCards(cards, { sessionType: "challenge" });
+      await prepareChallengeFromCards(cards, {
+        sessionType: "challenge",
+        ...prepareOpts,
+      });
     } catch {
       showToast("Could not prepare challenge. Try again.", "error");
       setMode(null);
@@ -446,6 +456,11 @@ const handleChallenge = async () => {
     setIsChallengeGenerating(false);
   }
 };
+
+const handleChallenge = async () => runChallengeSession();
+
+const handleContinueFullChallenge = async () =>
+  runChallengeSession({ forceFocusWeakCards: false });
 
   console.log("sessionCards type check:", sessionCards);
   console.log("Selected cards before render:", sessionCards);
@@ -527,7 +542,7 @@ const handleChallenge = async () => {
           previousPerformance={previousPerformance}
           reviewFlashcardIds={challengeReviewFlashcardIds}
           onReviewCards={handleReviewCards}
-          onContinueChallenge={handleChallenge}
+          onContinueChallenge={handleContinueFullChallenge}
           onRevealAnswer={challengeQuiz.revealAnswer}
           onAnswer={handleChallengeAnswer}
           onRestartChallenge={handleChallenge}

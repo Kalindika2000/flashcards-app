@@ -44,36 +44,34 @@ export function EditorNoteSection({
 }: EditorNoteSectionProps) {
   const quillStyle: CSSProperties = {
     width: "100%",
-    marginBottom: "12px",
+    marginBottom: 0,
   };
 
   return (
     <div
       style={{
+        padding: "16px",
         width: "100%",
         maxWidth: "600px",
         marginBottom: "40px",
+        boxSizing: "border-box",
       }}
     >
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: "20px",
-        }}
-      >
-        <h1 style={{ margin: 0 }}>Flashcards</h1>
+      <h1 style={{ margin: 0, marginBottom: "8px" }}>
+        {`Edit Note — ${(title || "").trim() || "Untitled"}`}
+      </h1>
 
+      <div style={{ marginBottom: "16px" }}>
         <button
           type="button"
           onClick={onSave}
           style={{
-            padding: "8px 16px",
-            borderRadius: "8px",
-            border: "none",
-            background: "#16a34a",
+            backgroundColor: "#16a34a",
             color: "white",
+            padding: "12px 18px",
+            borderRadius: "10px",
+            border: "none",
+            fontWeight: "600",
             cursor: "pointer",
           }}
         >
@@ -81,36 +79,48 @@ export function EditorNoteSection({
         </button>
       </div>
 
-      <input
-        value={title}
-        onChange={(e) => onTitleChange(e.target.value)}
-        placeholder="Enter note title (e.g. Photosynthesis)"
-        style={{
-          width: "100%",
-          padding: "10px",
-          borderRadius: "8px",
-          border: "1px solid #ccc",
-          marginBottom: "10px",
-          fontSize: "14px",
-        }}
-      />
+      <div style={{ marginBottom: "24px" }}>
+        <input
+          value={title}
+          onChange={(e) => onTitleChange(e.target.value)}
+          placeholder="Enter note title (e.g. Photosynthesis)"
+          style={{
+            width: "100%",
+            padding: "10px",
+            borderRadius: "8px",
+            border: "1px solid #ccc",
+            fontSize: "14px",
+            boxSizing: "border-box",
+          }}
+        />
+      </div>
 
-      <button
-        type="button"
-        onClick={onDeleteAllFlashcards}
+      <div style={{ marginBottom: "32px" }}>
+        <ReactQuill value={notes} onChange={onNotesChange} style={quillStyle} />
+      </div>
+
+      <div
         style={{
-          marginBottom: "10px",
-          padding: "8px 12px",
-          background: "red",
-          color: "white",
-          border: "none",
-          borderRadius: "6px",
+          marginTop: "32px",
+          borderTop: "1px solid #eee",
+          paddingTop: "16px",
         }}
       >
-        Delete All Flashcards
-      </button>
-
-      <ReactQuill value={notes} onChange={onNotesChange} style={quillStyle} />
+        <button
+          type="button"
+          onClick={onDeleteAllFlashcards}
+          style={{
+            padding: "8px 12px",
+            background: "red",
+            color: "white",
+            border: "none",
+            borderRadius: "6px",
+            cursor: "pointer",
+          }}
+        >
+          Delete All Flashcards
+        </button>
+      </div>
     </div>
   );
 }

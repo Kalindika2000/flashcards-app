@@ -60,15 +60,6 @@ export default function DeckNotesPage() {
           <div className="title">Notes</div>
           <div className="subtitle">Select a note</div>
         </div>
-
-        <div
-          className="fab"
-          onClick={() => {
-            router.push(`/editor?deckId=${deckId}`);
-          }}
-        >
-          +
-        </div>
       </div>
     </div>
 
@@ -132,6 +123,31 @@ style={{ position: "relative" }}
     router.push(`/editor?deckId=${deckId}`);
   }}
 />
+
+    <button
+      type="button"
+      onClick={() => {
+        router.push(`/editor?deckId=${deckId}`);
+      }}
+      style={{
+        position: "fixed",
+        bottom: "80px",
+        right: "20px",
+        width: "56px",
+        height: "56px",
+        borderRadius: "50%",
+        backgroundColor: "#2563eb",
+        color: "white",
+        fontSize: "28px",
+        border: "none",
+        boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
+        cursor: "pointer",
+        zIndex: 1000,
+      }}
+      aria-label="Create note"
+    >
+      +
+    </button>
    </div>
 );
 }

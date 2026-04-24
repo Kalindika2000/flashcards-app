@@ -9,6 +9,7 @@ export type ChallengeSummaryProps = {
   reviewFlashcardIds?: string[];
   onReviewCards?: () => void | Promise<void>;
   onRestart: () => void;
+  onContinueChallenge?: () => void | Promise<void>;
   onExit: () => void;
 };
 
@@ -22,6 +23,7 @@ export default function ChallengeSummary({
   reviewFlashcardIds,
   onReviewCards,
   onRestart,
+  onContinueChallenge,
   onExit,
 }: ChallengeSummaryProps) {
   const [entered, setEntered] = useState(false);
@@ -176,17 +178,32 @@ export default function ChallengeSummary({
             </p>
           </div>
         ) : (
-          <button
-            type="button"
-            disabled={isRestarting}
-            onClick={handleRestart}
-            className={[
-              "w-full rounded-xl bg-black py-3.5 text-center text-sm font-semibold text-white transition-all duration-150 hover:scale-[1.02] hover:opacity-90 active:scale-[0.98] dark:bg-white dark:text-black",
-              isRestarting ? "opacity-70" : "",
-            ].join(" ")}
-          >
-            Start New Challenge
-          </button>
+          <div className="flex flex-col gap-3">
+            <button
+              type="button"
+              disabled={isRestarting}
+              onClick={() => {
+                console.log("[UI] Retry Weak Cards clicked");
+                handleRestart();
+              }}
+              className={[
+                "w-full rounded-xl bg-black py-3.5 text-center text-sm font-semibold text-white transition-all duration-150 hover:scale-[1.02] hover:opacity-90 active:scale-[0.98] dark:bg-white dark:text-black",
+                isRestarting ? "opacity-70" : "",
+              ].join(" ")}
+            >
+              🔁 Retry Weak Cards
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                console.log("[UI] Start Full Challenge clicked");
+                void onContinueChallenge?.();
+              }}
+              className="w-full rounded-xl border border-gray-200 bg-gray-50 py-3 text-center text-sm font-medium text-gray-900 transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+            >
+              🎯 Start Full Challenge
+            </button>
+          </div>
         )}
         <div className="flex gap-3">
           <button
