@@ -16,6 +16,18 @@ export const CHALLENGE_SESSION_SIZE = 10;
 const PRIORITY_SLOT_COUNT = 7;
 const RANDOM_SLOT_COUNT = 3;
 
+function difficultyWeight(level: Flashcard["difficulty"]): number {
+  const difficultyWeightMap: Record<"easy" | "medium" | "hard", number> = {
+    easy: 1,
+    medium: 2,
+    hard: 3,
+  };
+  if (level === "easy" || level === "medium" || level === "hard") {
+    return difficultyWeightMap[level];
+  }
+  return 2;
+}
+
 export function computeConfidence(
   correctCount: number,
   incorrectCount: number,
@@ -43,28 +55,28 @@ export function lastSeenAtToMilliseconds(raw: unknown): number | null {
   return null;
 }
 
-/**
- * Down-weights very recently studied cards; never-seen gets full weight.
- */
-export function getRecencyFactor(lastSeenAt: number | null): number {
+/** Recency bucket score: recent cards are deprioritized, unseen cards get max. */
+export function getRecencyScore(lastSeenAt: number | null): number {
   const now = Date.now();
+  let recencyScore = 3; // Missing/never-seen -> high priority.
+  if (lastSeenAt != null) {
+    const diffMs = now - new Date(lastSeenAt).getTime();
+    const diffDays = diffMs / (1000 * 60 * 60 * 24);
+    if (diffDays < 0.5) recencyScore = 0;
+    else if (diffDays < 1) recencyScore = 1;
+    else if (diffDays < 3) recencyScore = 2;
+    else recencyScore = 3;
+  }
+  return recencyScore;
+}
 
-  if (lastSeenAt == null) {
-    return 1.0;
-  }
-
-  const minutesSinceSeen = (now - lastSeenAt) / (1000 * 60);
-
-  if (minutesSinceSeen < 5) {
-    return 0.2;
-  }
-  if (minutesSinceSeen < 30) {
-    return 0.5;
-  }
-  if (minutesSinceSeen < 120) {
-    return 0.8;
-  }
-  return 1.0;
+function getDecayMultiplier(lastReviewedAt?: string): number {
+  if (!lastReviewedAt) return 1;
+  const last = new Date(lastReviewedAt).getTime();
+  if (!Number.isFinite(last)) return 1;
+  const now = Date.now();
+  const diffDays = (now - last) / (1000 * 60 * 60 * 24);
+  return Math.pow(0.9, diffDays);
 }
 
 /**
@@ -108,24 +120,34 @@ export async function attachStats(
   );
 }
 
-/**
- * Lower confidence and less recent exposure → higher expected score (stochastic).
- */
 export function weightedShuffle(
   cards: FlashcardWithConfidence[],
 ): FlashcardWithConfidence[] {
-  return cards
+  const ranked = cards
     .map((card) => {
-      const confidenceWeight = 1 - card.confidence;
-      const recencyWeight = getRecencyFactor(card.lastSeenAt);
-      const combinedWeight = Math.max(0.05, confidenceWeight * recencyWeight);
-      return {
-        card,
-        score: Math.random() * combinedWeight,
-      };
+      const weaknessScoreRaw = (card as { weaknessScore?: unknown }).weaknessScore;
+      const weaknessScore =
+        typeof weaknessScoreRaw === "number" && Number.isFinite(weaknessScoreRaw)
+          ? weaknessScoreRaw
+          : (1 - card.confidence) * 3;
+      const reviewedAt =
+        card.lastReviewedAt ??
+        (card.lastSeenAt != null ? new Date(card.lastSeenAt).toISOString() : undefined);
+      const decayMultiplier = getDecayMultiplier(reviewedAt);
+      const adjustedWeakness = weaknessScore * decayMultiplier;
+      const recencyScore = getRecencyScore(card.lastSeenAt);
+      const difficultyWeightValue = difficultyWeight(card.difficulty);
+      const priorityScore =
+        adjustedWeakness * 0.6 + difficultyWeightValue * 0.25 + recencyScore * 0.15;
+      return { card, priorityScore };
     })
-    .sort((a, b) => b.score - a.score)
-    .map((item) => item.card);
+    .sort((a, b) => b.priorityScore - a.priorityScore);
+
+  // Optional variety: shuffle a high-priority window, then keep remaining order.
+  const topWindowSize = Math.min(ranked.length, CHALLENGE_SESSION_SIZE * 2);
+  const topWindow = shuffle(ranked.slice(0, topWindowSize).map((x) => x.card));
+  const rest = ranked.slice(topWindowSize).map((x) => x.card);
+  return [...topWindow, ...rest];
 }
 
 function dedupeKey(card: Flashcard): string {
@@ -287,6 +309,9 @@ export function pickFlashcardsWithPersistentWeakPreference<T extends Flashcard>(
   }
 
   const weakFlashcards = shuffle([...weakOrderedInDeck]);
+  weakFlashcards.sort(
+    (a, b) => difficultyWeight(b.difficulty) - difficultyWeight(a.difficulty),
+  );
   const normalFlashcards = shuffle(
     allCards.filter((c) => {
       const id = c.id?.trim();

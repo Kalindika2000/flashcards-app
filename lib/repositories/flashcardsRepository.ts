@@ -17,6 +17,7 @@ import type { Flashcard } from "@/features/study/types/flashcard";
 type FlashcardDoc = {
   question?: string;
   answer?: string;
+  difficulty?: "easy" | "medium" | "hard";
   noteId?: string;
   deckId?: string;
   known?: boolean;
@@ -71,6 +72,7 @@ export async function getFlashcardsByNote(
       id: flashDoc.id,
       question: data.question ?? "",
       answer: data.answer ?? "",
+      difficulty: data.difficulty ?? "medium",
       noteId: data.noteId ?? noteId,
       deckId: data.deckId,
       known: data.known ?? false,
@@ -117,7 +119,7 @@ export async function replaceFlashcardsForNote(params: {
   noteId: string;
   deckId?: string;
   noteVersion?: number;
-  cards: Array<Pick<Flashcard, "question" | "answer">>;
+  cards: Array<Pick<Flashcard, "question" | "answer" | "difficulty">>;
   userId?: string;
 }): Promise<void> {
   await deleteFlashcardsByNote(params.noteId, params.userId, {
@@ -128,6 +130,7 @@ export async function replaceFlashcardsForNote(params: {
     await addDoc(collection(db, "flashcards"), {
       question: card.question,
       answer: card.answer,
+      difficulty: card.difficulty ?? "medium",
       noteId: params.noteId,
       deckId: params.deckId ?? "",
       createdAt: serverTimestamp(),

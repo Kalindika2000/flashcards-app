@@ -1,5 +1,7 @@
 "use client";
 
+import { LoadingRow } from "@/components/ui/LoadingRow";
+
 /** Shown while challenge questions are being generated (AI + formatting). */
 export default function ChallengeQuestionsLoading() {
   return (
@@ -7,13 +9,13 @@ export default function ChallengeQuestionsLoading() {
       className="mx-auto w-full max-w-[440px] px-5 py-8"
       style={{ width: "calc(100% - 40px)" }}
     >
-      <p
-        className="mb-4 text-center text-sm font-semibold text-gray-600"
+      <div
+        className="mb-4 flex justify-center"
         role="status"
         aria-live="polite"
       >
-        Preparing questions…
-      </p>
+        <LoadingRow text="Preparing challenge..." />
+      </div>
       <div
         className="rounded-xl border-2 border-green-600/30 bg-white p-5 shadow-md"
         style={{ minHeight: "200px" }}

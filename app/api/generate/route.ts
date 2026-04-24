@@ -12,18 +12,26 @@ const client = new OpenAI({
 
 /** POST — body: { notes: string }. Rate-limited; optional Firebase ID token can be added later. */
 
-function normalizeFlashcards(raw: unknown): Array<{ question: string; answer: string }> {
+function normalizeDifficulty(raw: unknown): "easy" | "medium" | "hard" {
+  if (raw === "easy" || raw === "hard" || raw === "medium") return raw;
+  return "medium";
+}
+
+function normalizeFlashcards(
+  raw: unknown,
+): Array<{ question: string; answer: string; difficulty: "easy" | "medium" | "hard" }> {
   if (!Array.isArray(raw)) return [];
-  const out: Array<{ question: string; answer: string }> = [];
+  const out: Array<{ question: string; answer: string; difficulty: "easy" | "medium" | "hard" }> = [];
   for (const item of raw) {
     if (!item || typeof item !== "object") continue;
     const q = (item as { question?: unknown }).question;
     const a = (item as { answer?: unknown }).answer;
+    const d = (item as { difficulty?: unknown }).difficulty;
     if (typeof q !== "string" || typeof a !== "string") continue;
     const question = q.trim();
     const answer = a.trim();
     if (!question || !answer) continue;
-    out.push({ question, answer });
+    out.push({ question, answer, difficulty: normalizeDifficulty(d) });
   }
   return out;
 }
@@ -54,7 +62,7 @@ export async function POST(req: Request) {
         {
           role: "system",
           content:
-            "You must return ONLY valid JSON. Format exactly like this: [{\"question\": \"...\", \"answer\": \"...\"}]. No extra text.",
+            "You must return ONLY valid JSON. Format exactly like this: [{\"question\": \"...\", \"answer\": \"...\", \"difficulty\": \"easy|medium|hard\"}]. No extra text. For each flashcard: assign difficulty based on complexity. easy = simple definitions/direct facts; medium = relationships/explanations; hard = multi-step reasoning/complex ideas.",
         },
         {
           role: "user",

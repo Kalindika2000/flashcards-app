@@ -5,6 +5,7 @@ import { replaceFlashcardsForNote } from "@/lib/repositories/flashcardsRepositor
 type GeneratedFlashcard = {
   question: string;
   answer: string;
+  difficulty?: "easy" | "medium" | "hard";
 };
 
 type GenerateApiResponse = {

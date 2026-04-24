@@ -14,6 +14,9 @@ export function useEditorNote({ noteId, deckId, router }: UseEditorNoteParams) {
   const { user } = useAuth();
   const [title, setTitle] = useState("");
   const [notes, setNotes] = useState("");
+  const [noteVersion, setNoteVersion] = useState<number>(1);
+  const [summary, setSummary] = useState<string | null>(null);
+  const [summaryVersion, setSummaryVersion] = useState<number | null>(null);
   const [isDirty, setIsDirty] = useState(false);
   const [showLeaveModal, setShowLeaveModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -30,6 +33,9 @@ export function useEditorNote({ noteId, deckId, router }: UseEditorNoteParams) {
       setTitle(note.title || "");
       setNotes(note.content || "");
       setOriginalNotes(note.content || "");
+      setNoteVersion(note.version ?? 1);
+      setSummary(note.summary ?? null);
+      setSummaryVersion(note.summaryVersion ?? null);
       setIsDirty(false);
     };
 
@@ -44,6 +50,9 @@ export function useEditorNote({ noteId, deckId, router }: UseEditorNoteParams) {
       deckId: deckId ?? "",
       userId: user.uid,
     });
+    setNoteVersion(created.version ?? 1);
+    setSummary(created.summary ?? null);
+    setSummaryVersion(created.summaryVersion ?? null);
     return created.id;
   }, [deckId, notes, title, user]);
 
@@ -89,6 +98,7 @@ export function useEditorNote({ noteId, deckId, router }: UseEditorNoteParams) {
     const existing = await getNoteById(noteId, user.uid);
     const nextVersion = (existing?.version ?? 1) + 1;
     await updateNote(noteId, { title, content: notes, version: nextVersion });
+    setNoteVersion(nextVersion);
 
     setOriginalNotes(notes);
     setShowUpdateModal(false);
@@ -101,6 +111,7 @@ export function useEditorNote({ noteId, deckId, router }: UseEditorNoteParams) {
     const existing = await getNoteById(noteId, user.uid);
     const nextVersion = (existing?.version ?? 1) + 1;
     await updateNote(noteId, { title, content: notes, version: nextVersion });
+    setNoteVersion(nextVersion);
 
     setShowUpdateModal(false);
     setIsDirty(false);
@@ -130,11 +141,29 @@ export function useEditorNote({ noteId, deckId, router }: UseEditorNoteParams) {
     [originalNotes],
   );
 
+  const saveSummaryForCurrentVersion = useCallback(
+    async (summaryText: string) => {
+      if (!noteId || !user) return;
+      console.log("saveSummaryForCurrentVersion triggered");
+      const currentVersion = noteVersion ?? 1;
+      await updateNote(noteId, {
+        summary: summaryText,
+        summaryVersion: currentVersion,
+      });
+      setSummary(summaryText);
+      setSummaryVersion(currentVersion);
+    },
+    [noteId, noteVersion, user],
+  );
+
   return {
     title,
     setTitle,
     notes,
     setNotes,
+    noteVersion,
+    summary,
+    summaryVersion,
     isDirty,
     setIsDirty,
     showLeaveModal,
@@ -148,6 +177,7 @@ export function useEditorNote({ noteId, deckId, router }: UseEditorNoteParams) {
     handleSave,
     handleSaveOnly,
     handleGoToStudy,
+    saveSummaryForCurrentVersion,
     onTitleChange,
     onNotesChange,
   };

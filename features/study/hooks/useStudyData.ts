@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
-import { getNoteById } from "@/lib/repositories/notesRepository";
+import { getNoteById, updateNote } from "@/lib/repositories/notesRepository";
 import { getFlashcardsByNote } from "@/lib/repositories/flashcardsRepository";
+import { fetchNoteSummary } from "@/lib/services/noteSummaryService";
 import { generateAndSaveFlashcards } from "@/lib/services/flashcardGenerationService";
 import { useToast } from "@/components/ui/ToastProvider";
 import { getErrorMessage } from "@/lib/utils/errorMessage";
@@ -13,6 +14,8 @@ type StudyNote = {
   title: string;
   content: string;
   version?: number;
+  summary?: string | null;
+  summaryVersion?: number | null;
 };
 
 type UseStudyDataParams = {
@@ -41,7 +44,7 @@ export function useStudyData({
       const showOverlay = !options?.skipLoadingOverlay;
       if (showOverlay) {
         setLoading(true);
-        setLoadingMessage("Loading flashcards...");
+        setLoadingMessage("Generating flashcards...");
       }
 
       try {
@@ -67,9 +70,33 @@ export function useStudyData({
       setLoadingMessage("Generating flashcards...");
 
       try {
+        let generationInput = note.content;
+        const currentVersion = note.version ?? 1;
+        if (
+          note.summary &&
+          note.summaryVersion !== null &&
+          note.summaryVersion === currentVersion
+        ) {
+          console.log("Using cached summary for flashcards");
+          generationInput = note.summary;
+        } else {
+          console.log("Generating summary before flashcards");
+          const result = await fetchNoteSummary(note.content);
+          generationInput = result;
+          await updateNote(noteId, {
+            summary: result,
+            summaryVersion: currentVersion,
+          });
+          setNote((prev) =>
+            prev
+              ? { ...prev, summary: result, summaryVersion: currentVersion }
+              : prev,
+          );
+        }
+
         const generatedCards = await generateAndSaveFlashcards({
           noteId,
-          notes: note.content,
+          notes: generationInput,
           noteVersion: note?.version ?? 1,
           deckId,
         });
@@ -83,7 +110,7 @@ export function useStudyData({
           return;
         }
 
-        setLoadingMessage("Saving your flashcards...");
+        setLoadingMessage("Generating flashcards...");
         await loadFlashcards({ skipLoadingOverlay: true });
         if (!options?.skipSwitchToFlashcardMode) {
           setLoading(false);
@@ -95,7 +122,17 @@ export function useStudyData({
         showToast(getErrorMessage(err, "Failed to generate flashcards"), "error");
       }
     },
-    [deckId, loadFlashcards, note?.content, note?.version, noteId, onFlashcardsGenerated, showToast],
+    [
+      deckId,
+      loadFlashcards,
+      note?.content,
+      note?.summary,
+      note?.summaryVersion,
+      note?.version,
+      noteId,
+      onFlashcardsGenerated,
+      showToast,
+    ],
   );
 
   useEffect(() => {
@@ -108,6 +145,8 @@ export function useStudyData({
         title: noteData.title,
         content: noteData.content,
         version: noteData.version,
+        summary: noteData.summary ?? null,
+        summaryVersion: noteData.summaryVersion ?? null,
       });
     };
 

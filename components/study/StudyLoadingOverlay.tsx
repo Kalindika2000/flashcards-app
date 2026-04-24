@@ -1,5 +1,9 @@
 "use client";
 
+import { LoadingRow } from "@/components/ui/LoadingRow";
+
+export { StudyLoadingSpinner } from "@/components/study/StudyLoadingSpinner";
+
 type StudyLoadingOverlayProps = {
   loadingMessage: string;
 };
@@ -24,26 +28,7 @@ export default function StudyLoadingOverlay({
         zIndex: 99999,
       }}
     >
-      <div className="study-loading-spinner" aria-hidden />
-      <p style={{ marginTop: "12px", color: "#333", fontWeight: "500" }}>
-        {loadingMessage}
-      </p>
-      <style jsx>{`
-        .study-loading-spinner {
-          margin: 0 auto;
-          width: 32px;
-          height: 32px;
-          border: 4px solid #ddd;
-          border-top: 4px solid #2563eb;
-          border-radius: 50%;
-          animation: study-loading-spin 0.9s linear infinite;
-        }
-        @keyframes study-loading-spin {
-          to {
-            transform: rotate(360deg);
-          }
-        }
-      `}</style>
+      <LoadingRow text={loadingMessage} />
     </div>
   );
 }

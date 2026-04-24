@@ -179,6 +179,20 @@ useEffect(() => {
       <button
         type="button"
         onClick={() => setShowForm(true)}
+        onMouseDown={(e) => {
+          e.currentTarget.style.transform = "scale(0.92)";
+          e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.2)";
+        }}
+        onMouseUp={(e) => {
+          e.currentTarget.style.transform = "scale(1)";
+          e.currentTarget.style.boxShadow = "0 6px 16px rgba(0,0,0,0.2)";
+        }}
+        onTouchStart={(e) => {
+          e.currentTarget.style.transform = "scale(0.92)";
+        }}
+        onTouchEnd={(e) => {
+          e.currentTarget.style.transform = "scale(1)";
+        }}
         style={{
           position: "fixed",
           bottom: "80px",
@@ -190,9 +204,10 @@ useEffect(() => {
           color: "white",
           fontSize: "28px",
           border: "none",
-          boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
+          boxShadow: "0 6px 16px rgba(0,0,0,0.2)",
           cursor: "pointer",
           zIndex: 1000,
+          transition: "transform 0.15s ease, box-shadow 0.15s ease",
         }}
         aria-label="Add deck"
       >

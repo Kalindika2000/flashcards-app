@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ProgressCircle } from "@/components/ProgressCircle";
 import BottomNav from "@/components/BottomNav";
+import { EmptyState } from "@/components/ui/EmptyState";
 import type { Note } from "@/features/notes/types/note";
 import { getNotesByDeck } from "@/lib/repositories/notesRepository";
 import { getFlashcardsByNote } from "@/lib/repositories/flashcardsRepository";
@@ -113,9 +114,10 @@ style={{ position: "relative" }}
 
     {/* EMPTY STATE */}
     {notes.length === 0 && (
-      <div style={{ textAlign: "center", marginTop: "40px" }}>
-        <p>No notes yet</p>
-      </div>
+      <EmptyState
+        title="No notes yet"
+        description="Add a note to get started"
+      />
     )}
 
 <BottomNav
@@ -129,6 +131,20 @@ style={{ position: "relative" }}
       onClick={() => {
         router.push(`/editor?deckId=${deckId}`);
       }}
+      onMouseDown={(e) => {
+        e.currentTarget.style.transform = "scale(0.92)";
+        e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.2)";
+      }}
+      onMouseUp={(e) => {
+        e.currentTarget.style.transform = "scale(1)";
+        e.currentTarget.style.boxShadow = "0 6px 16px rgba(0,0,0,0.2)";
+      }}
+      onTouchStart={(e) => {
+        e.currentTarget.style.transform = "scale(0.92)";
+      }}
+      onTouchEnd={(e) => {
+        e.currentTarget.style.transform = "scale(1)";
+      }}
       style={{
         position: "fixed",
         bottom: "80px",
@@ -140,9 +156,10 @@ style={{ position: "relative" }}
         color: "white",
         fontSize: "28px",
         border: "none",
-        boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
+        boxShadow: "0 6px 16px rgba(0,0,0,0.2)",
         cursor: "pointer",
         zIndex: 1000,
+        transition: "transform 0.15s ease, box-shadow 0.15s ease",
       }}
       aria-label="Create note"
     >

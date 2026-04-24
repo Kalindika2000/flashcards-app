@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import DOMPurify from "isomorphic-dompurify";
+import { buttons } from "@/styles/ui";
 
 type StudyNotePanelProps = {
   note: {
@@ -48,14 +49,10 @@ export default function StudyNotePanel({
         </div>
 
         <button
+          type="button"
           onClick={onEdit}
           style={{
-            padding: "4px 10px",
-            fontSize: "12px",
-            borderRadius: "6px",
-            border: "1px solid #ccc",
-            background: "white",
-            cursor: "pointer",
+            ...buttons.secondary,
           }}
         >
           ✏️ Edit

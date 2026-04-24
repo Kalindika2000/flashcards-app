@@ -6,6 +6,8 @@ export type Note = {
   totalCards?: number;
   knownCards?: number;
   version?: number;
+  summary?: string | null;
+  summaryVersion?: number | null;
 };
 
 export type CreateNoteInput = {

@@ -412,7 +412,7 @@ const runChallengeSession = async (
   if (!noteId) return;
 
   setIsSessionComplete(false);
-  setStudyLoadingOverlay(true, "Loading flashcards...");
+  setStudyLoadingOverlay(true, "Generating flashcards...");
 
   try {
     let cards = await loadFlashcards({ skipLoadingOverlay: true });
@@ -423,7 +423,7 @@ const runChallengeSession = async (
         return;
       }
       await handleGenerateFlashcards({ skipSwitchToFlashcardMode: true });
-      setStudyLoadingOverlay(true, "Loading flashcards...");
+      setStudyLoadingOverlay(true, "Generating flashcards...");
       cards = await loadFlashcards({ skipLoadingOverlay: true });
     }
 

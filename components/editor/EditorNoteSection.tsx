@@ -1,7 +1,13 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import type { CSSProperties } from "react";
+import { useState, type CSSProperties } from "react";
+import ReactMarkdown from "react-markdown";
+import { htmlToPlainText } from "@/lib/api/htmlToPlainText";
+import { fetchNoteSummary } from "@/lib/services/noteSummaryService";
+import { ErrorState } from "@/components/ui/ErrorState";
+import { LoadingRow } from "@/components/ui/LoadingRow";
+import { buttons, spacing, typography } from "@/styles/ui";
 
 const ReactQuill = dynamic(() => import("./ReactQuillEditor"), {
   ssr: false,
@@ -28,6 +34,10 @@ const ReactQuill = dynamic(() => import("./ReactQuillEditor"), {
 type EditorNoteSectionProps = {
   title: string;
   notes: string;
+  noteVersion: number;
+  savedSummary: string | null;
+  savedSummaryVersion: number | null;
+  onSaveSummaryForCurrentVersion: (summaryText: string) => Promise<void>;
   onTitleChange: (title: string) => void;
   onNotesChange: (html: string) => void;
   onSave: () => void;
@@ -37,11 +47,20 @@ type EditorNoteSectionProps = {
 export function EditorNoteSection({
   title,
   notes,
+  noteVersion,
+  savedSummary,
+  savedSummaryVersion,
+  onSaveSummaryForCurrentVersion,
   onTitleChange,
   onNotesChange,
   onSave,
   onDeleteAllFlashcards,
 }: EditorNoteSectionProps) {
+  const [summary, setSummary] = useState<string | null>(null);
+  const [isSummarizing, setIsSummarizing] = useState(false);
+  const [isSummaryOpen, setIsSummaryOpen] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
   const quillStyle: CSSProperties = {
     width: "100%",
     marginBottom: 0,
@@ -50,36 +69,80 @@ export function EditorNoteSection({
   return (
     <div
       style={{
-        padding: "16px",
+        padding: spacing.sm,
         width: "100%",
         maxWidth: "600px",
         marginBottom: "40px",
         boxSizing: "border-box",
       }}
     >
-      <h1 style={{ margin: 0, marginBottom: "8px" }}>
+      <h1
+        style={{
+          margin: 0,
+          ...typography.title,
+          marginBottom: spacing.xs,
+        }}
+      >
         {`Edit Note — ${(title || "").trim() || "Untitled"}`}
       </h1>
 
-      <div style={{ marginBottom: "16px" }}>
+      <div
+        style={{
+          display: "flex",
+          gap: "12px",
+          marginBottom: spacing.sm,
+          justifyContent: "flex-start",
+        }}
+      >
+        <button type="button" onClick={onSave} style={{ ...buttons.primary }}>
+          Save
+        </button>
+
         <button
           type="button"
-          onClick={onSave}
-          style={{
-            backgroundColor: "#16a34a",
-            color: "white",
-            padding: "12px 18px",
-            borderRadius: "10px",
-            border: "none",
-            fontWeight: "600",
-            cursor: "pointer",
+          disabled={isSummarizing}
+          onClick={async () => {
+            const noteContent = notes;
+            if (!noteContent || !htmlToPlainText(noteContent).trim()) return;
+
+            setError(null);
+            setIsSummarizing(true);
+
+            try {
+              if (
+                savedSummary &&
+                savedSummaryVersion !== null &&
+                savedSummaryVersion === noteVersion
+              ) {
+                console.log("Using cached summary");
+                setSummary(savedSummary);
+                return;
+              }
+
+              console.log("Generating new summary");
+              const result = await fetchNoteSummary(noteContent);
+              setSummary(result);
+              console.log("Attempting to save summary", {
+                summary: result,
+                noteVersion,
+              });
+              await onSaveSummaryForCurrentVersion(result);
+            } catch (err) {
+              console.error("Summarization failed", err);
+              setError("Failed to summarize notes");
+            } finally {
+              setIsSummarizing(false);
+            }
           }}
+          style={{ ...buttons.secondary }}
         >
-          Save
+          Summarize Notes
         </button>
       </div>
 
-      <div style={{ marginBottom: "24px" }}>
+      {error ? <ErrorState message={error} /> : null}
+
+      <div style={{ marginBottom: spacing.md }}>
         <input
           value={title}
           onChange={(e) => onTitleChange(e.target.value)}
@@ -95,27 +158,73 @@ export function EditorNoteSection({
         />
       </div>
 
-      <div style={{ marginBottom: "32px" }}>
+      <div style={{ marginBottom: spacing.lg }}>
         <ReactQuill value={notes} onChange={onNotesChange} style={quillStyle} />
       </div>
 
+      {(isSummarizing || summary) && (
+        <div style={{ marginTop: spacing.lg }}>
+          <div
+            onClick={() => setIsSummaryOpen((prev) => !prev)}
+            style={{
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              marginBottom: "8px",
+            }}
+          >
+            <span style={{ fontWeight: "600" }}>🧠 Summary</span>
+            <span>{isSummaryOpen ? "▲" : "▼"}</span>
+          </div>
+
+          {isSummaryOpen && (
+            <div
+              style={{
+                background: "#ffffff",
+                padding: "16px",
+                borderRadius: "8px",
+                border: "1px solid #e5e7eb",
+                lineHeight: "1.6",
+                fontSize: "15px",
+              }}
+            >
+              {isSummarizing ? (
+                <LoadingRow text="Summarizing notes..." />
+              ) : (
+                <ReactMarkdown
+                  components={{
+                    li: ({ node, ...props }) => (
+                      <li
+                        style={{ marginBottom: "10px", lineHeight: "1.6" }}
+                        {...props}
+                      />
+                    ),
+                    p: ({ node, ...props }) => (
+                      <p style={{ marginBottom: "8px" }} {...props} />
+                    ),
+                  }}
+                >
+                  {summary ?? ""}
+                </ReactMarkdown>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       <div
         style={{
-          marginTop: "32px",
+          marginTop: spacing.lg,
           borderTop: "1px solid #eee",
-          paddingTop: "16px",
+          paddingTop: spacing.sm,
         }}
       >
         <button
           type="button"
           onClick={onDeleteAllFlashcards}
           style={{
-            padding: "8px 12px",
-            background: "red",
-            color: "white",
-            border: "none",
-            borderRadius: "6px",
-            cursor: "pointer",
+            ...buttons.destructive,
           }}
         >
           Delete All Flashcards

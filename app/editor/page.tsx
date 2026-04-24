@@ -45,6 +45,10 @@ function EditorPage() {
       <EditorNoteSection
         title={noteEditor.title}
         notes={noteEditor.notes}
+        noteVersion={noteEditor.noteVersion}
+        savedSummary={noteEditor.summary}
+        savedSummaryVersion={noteEditor.summaryVersion}
+        onSaveSummaryForCurrentVersion={noteEditor.saveSummaryForCurrentVersion}
         onTitleChange={noteEditor.onTitleChange}
         onNotesChange={noteEditor.onNotesChange}
         onSave={() => void noteEditor.handleSave()}

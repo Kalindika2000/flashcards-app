@@ -21,6 +21,8 @@ type NoteDoc = {
   version?: number;
   totalCards?: number;
   knownCards?: number;
+  summary?: string | null;
+  summaryVersion?: number | null;
 };
 
 export async function getNotesByDeck(
@@ -44,6 +46,8 @@ export async function getNotesByDeck(
       version: data.version,
       totalCards: data.totalCards,
       knownCards: data.knownCards,
+      summary: data.summary ?? null,
+      summaryVersion: data.summaryVersion ?? null,
     };
   });
 }
@@ -66,6 +70,8 @@ export async function getNoteById(
     version: data.version,
     totalCards: data.totalCards,
     knownCards: data.knownCards,
+    summary: data.summary ?? null,
+    summaryVersion: data.summaryVersion ?? null,
   };
 }
 
@@ -80,6 +86,8 @@ export async function createNote(
     totalCards: 0,
     knownCards: 0,
     version: 1,
+    summary: null,
+    summaryVersion: null,
     ...(input.userId ? { userId: input.userId } : {}),
   });
 
@@ -91,14 +99,20 @@ export async function createNote(
     version: 1,
     totalCards: 0,
     knownCards: 0,
+    summary: null,
+    summaryVersion: null,
   };
 }
 
 export async function updateNote(
   noteId: string,
-  patch: Partial<Pick<Note, "title" | "content" | "deckId" | "version">>,
+  patch: Partial<
+    Pick<Note, "title" | "content" | "deckId" | "version" | "summary" | "summaryVersion">
+  >,
 ): Promise<void> {
-  await updateDoc(doc(db, "notes", noteId), patch);
+  const updates = patch;
+  console.log("updateNote payload:", updates);
+  await updateDoc(doc(db, "notes", noteId), updates);
 }
 
 export async function bumpNoteVersion(noteId: string): Promise<void> {
