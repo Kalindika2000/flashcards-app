@@ -1,8 +1,8 @@
 "use client";
 
 import { useMemo } from "react";
-import DOMPurify from "isomorphic-dompurify";
 import { buttons } from "@/styles/ui";
+import { formatNoteContent } from "@/lib/utils/formatNoteContent";
 
 type StudyNotePanelProps = {
   note: {
@@ -20,13 +20,7 @@ export default function StudyNotePanel({
   onToggleNotes,
   onEdit,
 }: StudyNotePanelProps) {
-  const safeHtml = useMemo(
-    () =>
-      DOMPurify.sanitize(note.content, {
-        USE_PROFILES: { html: true },
-      }),
-    [note.content],
-  );
+  const formattedNote = useMemo(() => formatNoteContent(note.content), [note.content]);
 
   return (
     <div style={{ width: "100%", maxWidth: "900px", marginTop: "10px" }}>
@@ -80,9 +74,11 @@ export default function StudyNotePanel({
               color: "#555",
               marginTop: "6px",
               lineHeight: "1.6",
+              whiteSpace: "pre-wrap",
             }}
-            dangerouslySetInnerHTML={{ __html: safeHtml }}
-          />
+          >
+            {formattedNote}
+          </div>
         </div>
       )}
     </div>

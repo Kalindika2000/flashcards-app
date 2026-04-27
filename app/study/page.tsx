@@ -462,6 +462,16 @@ const handleChallenge = async () => runChallengeSession();
 const handleContinueFullChallenge = async () =>
   runChallengeSession({ forceFocusWeakCards: false });
 
+const handleSimulation = () => {
+  if (!noteId?.trim()) return;
+  const params = new URLSearchParams({ noteId: noteId.trim() });
+  const currentDeckId = searchParams.get("deckId");
+  if (currentDeckId?.trim()) {
+    params.set("deckId", currentDeckId.trim());
+  }
+  router.push(`/simulation?${params.toString()}`);
+};
+
   console.log("sessionCards type check:", sessionCards);
   console.log("Selected cards before render:", sessionCards);
 
@@ -513,6 +523,7 @@ const handleContinueFullChallenge = async () =>
   <StudyModeSelectionCard
     onSelectFlashcards={handleFlashcards}
     onSelectChallenge={handleChallenge}
+    onSelectSimulation={handleSimulation}
     focusWeakCards={focusWeakCards}
     onFocusWeakCardsChange={setFocusWeakCards}
   />

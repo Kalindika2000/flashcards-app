@@ -14,7 +14,6 @@ export default function StudyPageHeader({ onBack }: StudyPageHeaderProps) {
 
         <div className="header-text">
           <div className="title">Study</div>
-          <div className="subtitle">Review your cards</div>
         </div>
 
         <div style={{ width: "24px" }} />

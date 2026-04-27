@@ -3,11 +3,13 @@
 export default function ModeSelection({
   onSelectFlashcards,
   onSelectChallenge,
+  onSelectSimulation,
   focusWeakCards,
   onFocusWeakCardsChange,
 }: {
   onSelectFlashcards: () => void;
   onSelectChallenge: () => void;
+  onSelectSimulation: () => void;
   focusWeakCards: boolean;
   onFocusWeakCardsChange: (value: boolean) => void;
 }) {
@@ -90,6 +92,23 @@ onMouseUp={(e) => {
         </div>
         <div style={{ fontSize: "14px", opacity: 0.9 }}>
           Test yourself under pressure
+        </div>
+      </button>
+
+      <button
+  onClick={onSelectSimulation}
+  className="mode-button w-full p-5 rounded-2xl border"
+  style={{
+    backgroundColor: "#7c3aed",
+    color: "white",
+    boxShadow: "0 8px 20px rgba(124, 58, 237, 0.25)",
+  }}
+>
+        <div style={{ fontSize: "18px", fontWeight: "600" }}>
+          🎯 Simulation Mode
+        </div>
+        <div style={{ fontSize: "14px", opacity: 0.9 }}>
+          Practice in real scenarios
         </div>
       </button>
 

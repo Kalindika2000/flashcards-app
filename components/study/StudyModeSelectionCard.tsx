@@ -5,6 +5,7 @@ import ModeSelection from "@/components/ModeSelection";
 type StudyModeSelectionCardProps = {
   onSelectFlashcards: () => void;
   onSelectChallenge: () => void;
+  onSelectSimulation: () => void;
   focusWeakCards: boolean;
   onFocusWeakCardsChange: (value: boolean) => void;
 };
@@ -12,6 +13,7 @@ type StudyModeSelectionCardProps = {
 export default function StudyModeSelectionCard({
   onSelectFlashcards,
   onSelectChallenge,
+  onSelectSimulation,
   focusWeakCards,
   onFocusWeakCardsChange,
 }: StudyModeSelectionCardProps) {
@@ -29,6 +31,7 @@ export default function StudyModeSelectionCard({
       <ModeSelection
         onSelectFlashcards={onSelectFlashcards}
         onSelectChallenge={onSelectChallenge}
+        onSelectSimulation={onSelectSimulation}
         focusWeakCards={focusWeakCards}
         onFocusWeakCardsChange={onFocusWeakCardsChange}
       />

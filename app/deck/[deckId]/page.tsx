@@ -12,6 +12,7 @@ import type { Note } from "@/features/notes/types/note";
 import { getNotesByDeck } from "@/lib/repositories/notesRepository";
 import { getFlashcardsByNote } from "@/lib/repositories/flashcardsRepository";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { formatNoteContent } from "@/lib/utils/formatNoteContent";
 
 export default function DeckNotesPage() {
   const router = useRouter();
@@ -103,7 +104,7 @@ style={{ position: "relative" }}
                 <div className="deck-content">
                <div className="deck-title">{note.title}</div>
               <div className="deck-subject">
-                {note.content.slice(0, 40)}...
+                {formatNoteContent(note.content).slice(0, 40)}...
               </div>
             </div>
           </div>
