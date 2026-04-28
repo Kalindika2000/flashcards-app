@@ -1,13 +1,16 @@
 "use client";
 
-import { useMemo } from "react";
-import { buttons } from "@/styles/ui";
+import DOMPurify from "dompurify";
+import "react-quill/dist/quill.snow.css";
 import { formatNoteContent } from "@/lib/utils/formatNoteContent";
+import { buttons } from "@/styles/ui";
 
 type StudyNotePanelProps = {
   note: {
     title: string;
     content: string;
+    plainText?: string;
+    structuredContent?: string;
   };
   isNotesOpen: boolean;
   onToggleNotes: () => void;
@@ -20,7 +23,9 @@ export default function StudyNotePanel({
   onToggleNotes,
   onEdit,
 }: StudyNotePanelProps) {
-  const formattedNote = useMemo(() => formatNoteContent(note.content), [note.content]);
+  const raw = note.content ?? "";
+  const isHTML = /<\/?[a-z][\s\S]*>/i.test(raw);
+  const renderedContent = isHTML ? raw : formatNoteContent(raw);
 
   return (
     <div style={{ width: "100%", maxWidth: "900px", marginTop: "10px" }}>
@@ -68,17 +73,18 @@ export default function StudyNotePanel({
           <div style={{ fontSize: "18px", fontWeight: "bold" }}>{note.title}</div>
 
           <div
-            className="note-content"
+            className="note-content ql-editor study-note-rich"
             style={{
               fontSize: "14px",
               color: "#555",
               marginTop: "6px",
               lineHeight: "1.6",
-              whiteSpace: "pre-wrap",
+              whiteSpace: "normal",
             }}
-          >
-            {formattedNote}
-          </div>
+            dangerouslySetInnerHTML={{
+              __html: DOMPurify.sanitize(renderedContent),
+            }}
+          />
         </div>
       )}
     </div>

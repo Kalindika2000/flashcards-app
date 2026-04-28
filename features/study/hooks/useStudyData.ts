@@ -9,10 +9,14 @@ import { generateAndSaveFlashcards } from "@/lib/services/flashcardGenerationSer
 import { useToast } from "@/components/ui/ToastProvider";
 import { getErrorMessage } from "@/lib/utils/errorMessage";
 import type { Flashcard } from "@/features/study/types/flashcard";
+import type { NoteBlock } from "@/features/notes/types/note";
 
 type StudyNote = {
   title: string;
   content: string;
+  plainText?: string;
+  structuredContent?: string;
+  blocks?: NoteBlock[];
   version?: number;
   summary?: string | null;
   summaryVersion?: number | null;
@@ -70,7 +74,7 @@ export function useStudyData({
       setLoadingMessage("Generating flashcards...");
 
       try {
-        let generationInput = note.content;
+        let generationInput = note.plainText ?? note.content;
         const currentVersion = note.version ?? 1;
         if (
           note.summary &&
@@ -81,7 +85,7 @@ export function useStudyData({
           generationInput = note.summary;
         } else {
           console.log("Generating summary before flashcards");
-          const result = await fetchNoteSummary(note.content);
+          const result = await fetchNoteSummary(note.plainText ?? note.content);
           generationInput = result;
           await updateNote(noteId, {
             summary: result,
@@ -126,6 +130,7 @@ export function useStudyData({
       deckId,
       loadFlashcards,
       note?.content,
+      note?.plainText,
       note?.summary,
       note?.summaryVersion,
       note?.version,
@@ -144,6 +149,9 @@ export function useStudyData({
       setNote({
         title: noteData.title,
         content: noteData.content,
+        plainText: noteData.plainText,
+        structuredContent: noteData.structuredContent,
+        blocks: noteData.blocks,
         version: noteData.version,
         summary: noteData.summary ?? null,
         summaryVersion: noteData.summaryVersion ?? null,

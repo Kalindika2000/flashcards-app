@@ -283,3 +283,57 @@ body {
 .mode-button:active {
   transform: scale(0.96) !important;
 }
+
+/* Study note panel — structured HTML from plain lines or Quill */
+.study-note-rich h1,
+.study-note-rich h2,
+.study-note-rich h3 {
+  font-weight: 700;
+  margin-top: 16px;
+  margin-bottom: 6px;
+  color: #111827;
+}
+
+.study-note-rich.ql-editor h1,
+.study-note-rich.ql-editor h2,
+.study-note-rich.ql-editor h3 {
+  font-weight: 700 !important;
+}
+
+.study-note-rich p {
+  margin-bottom: 10px;
+  line-height: 1.6;
+}
+
+.study-note-rich ul {
+  padding-left: 20px;
+  margin-bottom: 10px;
+}
+
+.study-note-rich li {
+  margin-bottom: 4px;
+}
+/* Editor Quill view - mirror study-note typography */
+.editor-note-rich .ql-editor h1,
+.editor-note-rich .ql-editor h2,
+.editor-note-rich .ql-editor h3 {
+  font-weight: 700 !important;
+  margin-top: 16px;
+  margin-bottom: 6px;
+  color: #111827;
+}
+
+.editor-note-rich .ql-editor p {
+  margin-bottom: 10px;
+  line-height: 1.6;
+}
+
+.editor-note-rich .ql-editor ul {
+  padding-left: 20px;
+  margin-bottom: 10px;
+}
+
+.editor-note-rich .ql-editor li {
+  margin-bottom: 4px;
+}
+

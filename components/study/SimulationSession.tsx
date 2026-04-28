@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import type { Flashcard } from "@/features/study/types/flashcard";
 import {
@@ -20,7 +20,8 @@ import { updateFlashcardStats } from "@/lib/services/updateFlashcardStats";
 import { generateScenario } from "@/lib/services/simulationScenarioService";
 import { inferRole } from "@/lib/services/roleInferenceService";
 import { getNoteById } from "@/lib/repositories/notesRepository";
-import { formatNoteContent } from "@/lib/utils/formatNoteContent";
+import ReactMarkdown from "react-markdown";
+import { noteContentToPlainText } from "@/lib/utils/formatNoteContent";
 import { useStudyData } from "@/features/study/hooks/useStudyData";
 
 type SimulationSessionProps = {
@@ -71,10 +72,6 @@ export default function SimulationSession({
   const onFlashcardsGenerated = useCallback(() => {}, []);
 
   const hasUserMessage = messages.some((m) => m.role === "user");
-  const formattedReferenceNotes = useMemo(
-    () => formatNoteContent(referenceNotes),
-    [referenceNotes],
-  );
 
   const { loadFlashcards, handleGenerateFlashcards } = useStudyData({
     noteId: trimmedNoteId || null,
@@ -143,7 +140,9 @@ export default function SimulationSession({
         const noteData = await getNoteById(trimmedNoteId, user.uid);
         if (cancelled) return;
         const content = noteData?.content?.trim() ?? "";
-        setReferenceNotes(content);
+        setReferenceNotes(
+          noteData?.structuredContent ?? noteData?.plainText ?? noteContentToPlainText(content),
+        );
         if (!content) {
           setInferredRole("Professional");
           return;
@@ -495,14 +494,46 @@ export default function SimulationSession({
               color: "#374151",
               padding: "12px",
               borderTop: "1px solid #e5e7eb",
-              whiteSpace: "pre-wrap",
               fontSize: "14px",
               lineHeight: 1.5,
             }}
           >
-            {formattedReferenceNotes
-              ? formattedReferenceNotes
-              : "No reference notes available."}
+            {referenceNotes ? (
+              <ReactMarkdown
+                components={{
+                  h2: ({ node, ...props }) => {
+                    void node;
+                    return (
+                      <h2
+                        style={{ fontSize: "16px", fontWeight: 700, margin: "10px 0 6px" }}
+                        {...props}
+                      />
+                    );
+                  },
+                  h3: ({ node, ...props }) => {
+                    void node;
+                    return (
+                      <h3
+                        style={{ fontSize: "14px", fontWeight: 600, margin: "8px 0 4px" }}
+                        {...props}
+                      />
+                    );
+                  },
+                  li: ({ node, ...props }) => {
+                    void node;
+                    return <li style={{ marginBottom: "6px" }} {...props} />;
+                  },
+                  p: ({ node, ...props }) => {
+                    void node;
+                    return <p style={{ marginBottom: "6px" }} {...props} />;
+                  },
+                }}
+              >
+                {referenceNotes}
+              </ReactMarkdown>
+            ) : (
+              "No reference notes available."
+            )}
           </div>
         ) : null}
       </div>

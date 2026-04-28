@@ -159,7 +159,7 @@ export function EditorNoteSection({
       </div>
 
       <div style={{ marginBottom: spacing.lg }}>
-        <ReactQuill value={notes} onChange={onNotesChange} style={quillStyle} />
+        <ReactQuill value={notes} onChange={onNotesChange} style={quillStyle} className="editor-note-rich" />
       </div>
 
       {(isSummarizing || summary) && (
@@ -233,3 +233,4 @@ export function EditorNoteSection({
     </div>
   );
 }
+
