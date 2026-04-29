@@ -36,6 +36,22 @@ export function computeConfidence(
   return total === 0 ? 0.5 : correctCount / total;
 }
 
+export function isWeakFromStats(stat?: {
+  correctCount?: number;
+  incorrectCount?: number;
+}): boolean {
+  if (!stat) return true;
+
+  const correct = stat.correctCount ?? 0;
+  const incorrect = stat.incorrectCount ?? 0;
+  const total = correct + incorrect;
+
+  if (total === 0) return true;
+
+  const confidence = correct / total;
+  return confidence < 0.7;
+}
+
 /** Normalize Firestore Timestamp / Date / number to epoch ms, or `null`. */
 export function lastSeenAtToMilliseconds(raw: unknown): number | null {
   if (raw == null) return null;

@@ -9,14 +9,14 @@ import { mapFlashcardsToChallengeQuestions } from "@/features/study/utils/mapFla
 import { normalizeOptionFormat } from "@/features/study/utils/normalizeOptionFormat";
 import {
   attachStats,
-  buildWeakOrderedInDeck,
+  isWeakFromStats,
   selectFlashcardsForChallengeSession,
   stripConfidence,
   type FlashcardWithConfidence,
 } from "@/features/study/utils/challengeFlashcardSelection";
-import { getWeakCards } from "@/lib/userCardStats";
 import { buildDifficultyByFlashcardId } from "@/features/study/utils/mcqDifficulty";
 import { prefetchDefinitionMisconceptionsForChallenge } from "@/features/study/utils/prefetchDefinitionMisconceptions";
+import { getUserFlashcardStat } from "@/lib/repositories/userFlashcardStatsRepository";
 
 export type ChallengeOptions = {
   focusWeakCards?: boolean;
@@ -51,11 +51,34 @@ export async function generateChallengeQuestions(
 
   let selectedWithStats: FlashcardWithConfidence[];
   if (options?.focusWeakCards === true && userId?.trim()) {
-    const weakSorted = await getWeakCards(
-      userId.trim(),
-      "ChallengeMode|WeakCards|user_card_stats|generateQuestions",
+    const statsByFlashcardId = new Map<
+      string,
+      { correctCount: number; incorrectCount: number } | undefined
+    >();
+    await Promise.all(
+      flashcardsWithStats.map(async (card) => {
+        const flashcardId = card.id?.trim();
+        if (!flashcardId) return;
+        const stat = await getUserFlashcardStat(
+          userId.trim(),
+          flashcardId,
+          "ChallengeMode|WeakCards|user_flashcard_stats|generateQuestions",
+        );
+        if (!stat) {
+          statsByFlashcardId.set(flashcardId, undefined);
+          return;
+        }
+        statsByFlashcardId.set(flashcardId, {
+          correctCount: stat.correctCount,
+          incorrectCount: stat.incorrectCount,
+        });
+      }),
     );
-    const picked = buildWeakOrderedInDeck(flashcardsWithStats, weakSorted);
+    const picked = flashcardsWithStats.filter((card) => {
+      const flashcardId = card.id?.trim();
+      if (!flashcardId) return true;
+      return isWeakFromStats(statsByFlashcardId.get(flashcardId));
+    });
     console.log("Weak selection output:", picked);
     console.log("Returned from weak selection");
     if (picked.length > 0) {

@@ -8,9 +8,7 @@ import type {
 } from "@/features/study/types/challengeQuestion";
 import ChallengeSummary from "@/components/study/ChallengeSummary";
 import { QuestionRenderer } from "@/components/study/QuestionRenderer";
-import { useAuth } from "@/components/auth/AuthProvider";
 import { getHints } from "@/lib/hintService";
-import { updateCardStats } from "@/lib/userCardStats";
 
 /** Fade current card shortly before auto-advance (matches hook delay tail). */
 const TRANSITION_OUT_DELAY_MS = 600;
@@ -24,18 +22,11 @@ type StudyChallengeSessionProps = {
   correctCount: number;
   streak: number;
   isComplete: boolean;
-  sessionType?: "challenge" | "review";
   answerResultsByFlashcardId?: Record<string, ChallengeAnswerResult>;
-  reviewIncorrectCountsByFlashcardId?: Record<string, number>;
-  previousPerformance?: {
-    previousCorrect: number;
-    previousTotal: number;
-  } | null;
+  /** Count of distinct flashcards answered incorrectly (for summary). */
+  totalIncorrectFlashcards?: number;
   /** When true, session was built with weak-card focus (selection may still fall back if deck is uniformly strong). */
   focusWeakCards?: boolean;
-  reviewFlashcardIds?: string[];
-  onReviewCards?: () => void | Promise<void>;
-  onContinueChallenge?: () => void | Promise<void>;
   onRevealAnswer: () => void;
   onAnswer: (result: ChallengeAnswerResult) => void;
   onRestartChallenge: () => void;
@@ -50,20 +41,14 @@ export default function StudyChallengeSession({
   correctCount,
   streak,
   isComplete,
-  sessionType = "challenge",
   answerResultsByFlashcardId = {},
-  reviewIncorrectCountsByFlashcardId = {},
-  previousPerformance,
+  totalIncorrectFlashcards = 0,
   focusWeakCards = false,
-  reviewFlashcardIds = [],
-  onReviewCards,
-  onContinueChallenge,
   onRevealAnswer,
   onAnswer,
   onRestartChallenge,
   onBackToModes,
 }: StudyChallengeSessionProps) {
-  const { user } = useAuth();
   const total = questions.length;
   const current = questions[currentQuestionIndex];
   const [cardAttemptCounts, setCardAttemptCounts] = useState<Record<string, number>>(
@@ -182,7 +167,6 @@ export default function StudyChallengeSession({
   const handleAnswerWithTransition = useCallback(
     (result: ChallengeAnswerResult) => {
       const id = current?.flashcardId?.trim();
-      const usedHint = Boolean(id && hintRevealedByCard[id]);
       if (id && result === "incorrect") {
         setCardIncorrectCounts((prev) => ({
           ...prev,
@@ -203,24 +187,6 @@ export default function StudyChallengeSession({
         }, RECOVERY_FEEDBACK_MS);
       }
       onAnswer(result);
-      if (user?.uid && id) {
-        void (async () => {
-          try {
-            await updateCardStats({
-              userId: user.uid,
-              cardId: id,
-              isCorrect: result === "correct",
-              usedHint,
-              debugContext:
-                sessionType === "review"
-                  ? "ChallengeMode|Review|answer|user_card_stats"
-                  : "ChallengeMode|Challenge|answer|user_card_stats",
-            });
-          } catch (err) {
-            console.error("[StudyChallengeSession] updateCardStats", err);
-          }
-        })();
-      }
       if (transitionOutTimerRef.current) {
         clearTimeout(transitionOutTimerRef.current);
       }
@@ -235,12 +201,10 @@ export default function StudyChallengeSession({
       hideHintWithFade,
       hintRevealedByCard,
       onAnswer,
-      sessionType,
-      user?.uid,
     ],
   );
 
-  const totalIncorrect = reviewFlashcardIds.length;
+  const totalIncorrect = totalIncorrectFlashcards;
   const currentFlashcardId = current?.flashcardId?.trim() ?? "";
   const currentAttemptCount =
     currentFlashcardId.length > 0 ? (cardAttemptCounts[currentFlashcardId] ?? 0) : 0;
@@ -249,12 +213,7 @@ export default function StudyChallengeSession({
       ? answerResultsByFlashcardId[currentFlashcardId]
       : undefined;
   const currentIncorrectCount =
-    currentFlashcardId.length > 0
-      ? Math.max(
-          cardIncorrectCounts[currentFlashcardId] ?? 0,
-          reviewIncorrectCountsByFlashcardId[currentFlashcardId] ?? 0,
-        )
-      : 0;
+    currentFlashcardId.length > 0 ? (cardIncorrectCounts[currentFlashcardId] ?? 0) : 0;
   const hintThreshold = 2;
   const hints = hintsByCard[currentFlashcardId] ?? [];
   const hintIndex = Math.min(Math.max(currentIncorrectCount - hintThreshold, 0), 3);
@@ -266,13 +225,11 @@ export default function StudyChallengeSession({
       : false;
   const shouldShowHintPrompt =
     !isComplete &&
-    sessionType === "review" &&
     currentIncorrectCount >= 2 &&
     !hintAlreadyShown &&
     currentFlashcardId.length > 0;
   const shouldShowPartialHint =
     !isComplete &&
-    sessionType === "review" &&
     currentFlashcardId.length > 0 &&
     Boolean(hintRevealedByCard[currentFlashcardId]);
   const shouldShowHintAnswer =
@@ -285,45 +242,10 @@ export default function StudyChallengeSession({
     currentFlashcardId.length > 0 ? Boolean(hintDismissedByCard[currentFlashcardId]) : false;
   const showRecoveryFeedback =
     !isComplete &&
-    sessionType === "review" &&
     currentResult === "correct" &&
     currentFlashcardId.length > 0 &&
     showRecoveryForCardId === currentFlashcardId &&
     currentIncorrectCount >= 2;
-  const currentAccuracy =
-    total > 0 ? Math.round((correctCount / total) * 100) : 0;
-  const previousAccuracy =
-    previousPerformance && previousPerformance.previousTotal > 0
-      ? Math.round(
-          (previousPerformance.previousCorrect / previousPerformance.previousTotal) *
-            100,
-        )
-      : null;
-  const accuracyDelta =
-    previousAccuracy != null ? currentAccuracy - previousAccuracy : 0;
-  const previousIncorrect =
-    previousPerformance != null
-      ? Math.max(0, previousPerformance.previousTotal - previousPerformance.previousCorrect)
-      : 0;
-  const masteredCount = Math.max(0, previousIncorrect - totalIncorrect);
-  const reviewSummaryTitle =
-    accuracyDelta > 0
-      ? "Nice improvement 🚀"
-      : accuracyDelta === 0
-        ? "Almost there 👀"
-        : "Keep going 💪";
-  const reviewSummaryMainStat =
-    accuracyDelta > 0
-      ? `${previousAccuracy ?? 0}% → ${currentAccuracy}% (+${accuracyDelta}%)`
-      : accuracyDelta === 0
-        ? `${currentAccuracy}% correct again`
-        : `${currentAccuracy}% correct this round`;
-  const reviewSummaryMessage =
-    accuracyDelta > 0
-      ? "Big improvement — keep it going"
-      : accuracyDelta === 0
-        ? "One more pass should do it"
-        : "This one’s tricky — another quick review will help lock it in";
 
   return (
     <>
@@ -460,72 +382,14 @@ export default function StudyChallengeSession({
         </>
       )}
 
-      {isComplete && sessionType === "challenge" && (
+      {isComplete && (
         <ChallengeSummary
           correctCount={correctCount}
           totalQuestions={total}
           totalIncorrect={totalIncorrect}
-          reviewFlashcardIds={reviewFlashcardIds}
-          onReviewCards={onReviewCards}
           onRestart={onRestartChallenge}
-          onContinueChallenge={onContinueChallenge}
           onExit={onBackToModes}
         />
-      )}
-      {isComplete && sessionType === "review" && (
-        <div className="mx-auto flex max-w-lg flex-col gap-6 px-6 py-10">
-          <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-md dark:border-gray-800 dark:bg-gray-900">
-            <h2 className="text-center text-2xl font-semibold text-gray-900 dark:text-gray-100">
-              {reviewSummaryTitle}
-            </h2>
-            <p className="mt-4 text-center text-3xl font-bold tabular-nums text-gray-900 dark:text-gray-100">
-              {reviewSummaryMainStat}
-            </p>
-            <div className="mt-4 space-y-1 text-center text-sm text-gray-600 dark:text-gray-400">
-              <p>
-                Before: {previousPerformance?.previousCorrect ?? 0} /{" "}
-                {previousPerformance?.previousTotal ?? 0}
-              </p>
-              <p>
-                Now: {correctCount} / {total}
-              </p>
-            </div>
-            {previousIncorrect > 0 ? (
-              <p className="mt-4 text-center text-sm text-gray-500 dark:text-gray-400">
-                You&apos;ve mastered {masteredCount} of {previousIncorrect} review cards
-              </p>
-            ) : null}
-            <p className="mt-4 text-center text-sm text-gray-600 dark:text-gray-400">
-              {reviewSummaryMessage}
-            </p>
-          </div>
-
-          <div className="flex flex-col gap-3">
-            <button
-              type="button"
-              onClick={() => void onContinueChallenge?.()}
-              className="w-full rounded-xl bg-black py-3.5 text-center text-sm font-semibold text-white transition-all duration-150 hover:scale-[1.02] hover:opacity-90 active:scale-[0.98] dark:bg-white dark:text-black"
-            >
-              Continue Challenge
-            </button>
-            {totalIncorrect > 0 && onReviewCards ? (
-              <button
-                type="button"
-                onClick={() => void onReviewCards()}
-                className="w-full rounded-xl border border-gray-200 bg-gray-50 py-3 text-center text-sm font-medium text-gray-900 transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
-              >
-                Review again
-              </button>
-            ) : null}
-            <button
-              type="button"
-              onClick={onBackToModes}
-              className="w-full rounded-xl border border-gray-200 bg-white py-3 text-center text-sm font-medium text-gray-900 transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
-            >
-              Back to Notes
-            </button>
-          </div>
-        </div>
       )}
     </>
   );

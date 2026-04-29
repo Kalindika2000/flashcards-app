@@ -5,7 +5,6 @@ import {
   doc,
   getDoc,
   getDocs,
-  increment,
   query,
   serverTimestamp,
   updateDoc,
@@ -163,8 +162,6 @@ export async function markFlashcardResult(params: {
 
   await updateDoc(flashRef, {
     known: params.isKnown,
-    timesSeen: increment(1),
-    timesCorrect: params.isKnown ? increment(1) : increment(0),
   });
 
   if (noteId) {

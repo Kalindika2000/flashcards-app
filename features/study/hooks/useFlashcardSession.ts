@@ -2,17 +2,20 @@
 
 import { useCallback, useMemo, useState } from "react";
 import type { Flashcard } from "@/features/study/types/flashcard";
+import { getUserFlashcardStat } from "@/lib/repositories/userFlashcardStatsRepository";
 
 type RestartMode = "all" | "difficult";
 type FeedbackState = null | "known" | "unknown";
 
 type UseFlashcardSessionParams = {
+  userId?: string | null;
   onPersistMark?: (flashcardId: string, isKnown: boolean) => Promise<void>;
   onRestartStart?: () => void;
   onRestartEnd?: () => void;
 };
 
 export function useFlashcardSession({
+  userId,
   onPersistMark,
   onRestartStart,
   onRestartEnd,
@@ -73,16 +76,40 @@ export function useFlashcardSession({
     const freshCards = flashcards;
     setFlashcards(freshCards);
 
+    const uid = userId?.trim();
+    const statEntries = await Promise.all(
+      freshCards.map(async (card) => {
+        const cardId = card.id?.trim();
+        if (!uid || !cardId) {
+          return {
+            total: 0,
+            confidence: null as number | null,
+          };
+        }
+
+        const stat = await getUserFlashcardStat(
+          uid,
+          cardId,
+          "FlashcardMode|restart|user_flashcard_stats",
+        );
+        const correctCount = stat?.correctCount ?? 0;
+        const incorrectCount = stat?.incorrectCount ?? 0;
+        const total = correctCount + incorrectCount;
+        const confidence = total > 0 ? correctCount / total : null;
+        return { total, confidence };
+      }),
+    );
+
     let newCards: number[];
     if (restartMode === "all") {
       const sorted = freshCards
-        .map((card, i) => {
-          const timesSeen = card.timesSeen || 0;
-          const timesCorrect = card.timesCorrect || 0;
-          if (timesSeen === 0) return { index: i, priority: 2 };
+        .map((_, i) => {
+          const entry = statEntries[i];
+          if (!entry || entry.total === 0 || entry.confidence === null) {
+            return { index: i, priority: 2 };
+          }
 
-          const accuracy = timesCorrect / timesSeen;
-          if (accuracy < 0.7) return { index: i, priority: 1 };
+          if (entry.confidence < 0.7) return { index: i, priority: 1 };
           return { index: i, priority: 0 };
         })
         .sort((a, b) => b.priority - a.priority);
@@ -90,23 +117,20 @@ export function useFlashcardSession({
       newCards = sorted.map((item) => item.index);
     } else {
       const filtered = freshCards
-        .map((card, i) => {
-          const timesSeen = card.timesSeen || 0;
-          const timesCorrect = card.timesCorrect || 0;
-          if (timesSeen === 0) return i;
-
-          const accuracy = timesCorrect / timesSeen;
-          return accuracy < 0.7 ? i : -1;
+        .map((_, i) => {
+          const entry = statEntries[i];
+          if (!entry || entry.total === 0 || entry.confidence === null) return i;
+          return entry.confidence < 0.7 ? i : -1;
         })
         .filter((i) => i !== -1);
 
       const sorted = filtered
         .map((i) => {
-          const card = freshCards[i];
-          const timesSeen = card.timesSeen || 0;
-          const timesCorrect = card.timesCorrect || 0;
-          const accuracy = timesSeen === 0 ? 0 : timesCorrect / timesSeen;
-          const difficulty = 1 - accuracy;
+          const entry = statEntries[i];
+          const difficulty =
+            !entry || entry.total === 0 || entry.confidence === null
+              ? Number.POSITIVE_INFINITY
+              : 1 - entry.confidence;
           return { index: i, difficulty };
         })
         .sort((a, b) => b.difficulty - a.difficulty);
@@ -120,7 +144,7 @@ export function useFlashcardSession({
     setStreak(0);
     setIsSessionComplete(false);
     onRestartEnd?.();
-  }, [flashcards, onRestartEnd, onRestartStart, restartMode]);
+  }, [flashcards, onRestartEnd, onRestartStart, restartMode, userId]);
 
   const handleMarkCard = useCallback(
     async (isCorrect: boolean) => {

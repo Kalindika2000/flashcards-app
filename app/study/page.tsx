@@ -22,19 +22,17 @@ import { useFlashcardSession } from "@/features/study/hooks/useFlashcardSession"
 import { useStudyData } from "@/features/study/hooks/useStudyData";
 import { generateChallengeQuestions } from "@/features/study/utils/generateChallengeQuestions";
 import {
-  buildWeakOrderedInDeck,
-  orderFlashcardIndicesByWeakStats,
+  isWeakFromStats,
 } from "@/features/study/utils/challengeFlashcardSelection";
-import { getWeakCards } from "@/lib/userCardStats";
 import type { ChallengeAnswerResult, ChallengeQuestion } from "@/features/study/types/challengeQuestion";
 import type { Flashcard } from "@/features/study/types/flashcard";
 import { updateFlashcardStats } from "@/lib/services/updateFlashcardStats";
 import { useToast } from "@/components/ui/ToastProvider";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { saveChallengeSession } from "@/lib/repositories/challengeSessionsRepository";
+import { getUserFlashcardStat } from "@/lib/repositories/userFlashcardStatsRepository";
 import { DEFAULT_CHALLENGE_SESSION_MODE } from "@/features/challengeSessions/constants";
 
-type SessionType = "challenge" | "review";
 const DEBUG_CHALLENGE_LOGS = false;
 
 function StudyPage() {
@@ -45,16 +43,9 @@ function StudyPage() {
   );
   const [isChallengeGenerating, setIsChallengeGenerating] = useState(false);
   const [focusWeakCards, setFocusWeakCards] = useState(false);
-  const [sessionType, setSessionType] = useState<SessionType>("challenge");
-  const [previousPerformance, setPreviousPerformance] = useState<{
-    previousCorrect: number;
-    previousTotal: number;
-  } | null>(null);
   const [challengeSessionResults, setChallengeSessionResults] = useState<
     Record<string, ChallengeAnswerResult>
   >({});
-  const [reviewIncorrectCountsByFlashcardId, setReviewIncorrectCountsByFlashcardId] =
-    useState<Record<string, number>>({});
   const searchParams = useSearchParams();
   const router = useRouter();
   const { showToast } = useToast();
@@ -106,6 +97,7 @@ function StudyPage() {
     handleMarkCard,
     setSessionCards,
   } = useFlashcardSession({
+    userId: user?.uid,
     onPersistMark: onPersistFlashcardMark,
   });
 const {
@@ -137,12 +129,6 @@ const {
           ...prev,
           [q.flashcardId]: result,
         }));
-        if (sessionType === "review" && result === "incorrect") {
-          setReviewIncorrectCountsByFlashcardId((prev) => ({
-            ...prev,
-            [q.flashcardId]: (prev[q.flashcardId] ?? 0) + 1,
-          }));
-        }
       }
       if (user?.uid && q?.flashcardId) {
         if (DEBUG_CHALLENGE_LOGS) {
@@ -157,16 +143,12 @@ const {
           flashcardId: q.flashcardId,
           isCorrect: result === "correct",
           mode: "challenge",
-          debugContext:
-            sessionType === "review"
-              ? "ChallengeMode|Review|answer|user_flashcard_stats"
-              : "ChallengeMode|Challenge|answer|user_flashcard_stats",
+          debugContext: "ChallengeMode|Challenge|answer|user_flashcard_stats",
         });
       }
       challengeHandleAnswer(result);
     },
     [
-      sessionType,
       challengeHandleAnswer,
       challengeQuiz.currentQuestionIndex,
       challengeQuestions,
@@ -189,6 +171,128 @@ const {
     challengeSessionResults,
   ]);
   const challengeSessionSavedRef = useRef(false);
+
+  const prepareChallengeFromCards = useCallback(
+    async (cards: Flashcard[]) => {
+      console.log("Session initialization started");
+      setChallengeQuestions([]);
+      setChallengeSessionResults({});
+      challengeSessionSavedRef.current = false;
+      setMode("challenge");
+
+      const mapped = await generateChallengeQuestions(cards, user?.uid, {
+        focusWeakCards,
+      });
+      const indices = mapped
+        .map((q) => cards.findIndex((c) => c.question === q.question))
+        .filter((i) => i !== -1);
+
+      console.log("Final mapped indices:", indices);
+
+      if (indices.length > 0) {
+        setSessionCards(indices);
+        console.log("Applied sessionCards:", indices);
+      } else {
+        console.warn("No valid indices found — sessionCards not set");
+      }
+
+      mapped.forEach((q) => {
+        const match = cards.find((c) => c.question === q.question);
+        console.log("Mapping question → card:", q.question, "→", match?.id);
+      });
+      if (mapped.length === 0) {
+        showToast(
+          "Flashcards are missing IDs. Regenerate flashcards from the editor and try again.",
+          "error",
+        );
+        setMode(null);
+        return false;
+      }
+      setChallengeQuestions(mapped);
+      return true;
+    },
+    [user?.uid, focusWeakCards, showToast],
+  );
+
+  const runChallengeSession = useCallback(async () => {
+    if (!noteId) return;
+
+    setIsSessionComplete(false);
+    setStudyLoadingOverlay(true, "Generating flashcards...");
+
+    try {
+      let cards = await loadFlashcards({ skipLoadingOverlay: true });
+
+      if (!cards?.length) {
+        if (!note?.content?.trim()) {
+          showToast("Load your note first, then try Challenge mode again.", "error");
+          return;
+        }
+        await handleGenerateFlashcards({ skipSwitchToFlashcardMode: true });
+        setStudyLoadingOverlay(true, "Generating flashcards...");
+        cards = await loadFlashcards({ skipLoadingOverlay: true });
+      }
+
+      if (!cards?.length) {
+        showToast(
+          "No flashcards yet. Add more note content and generate flashcards first.",
+          "info",
+        );
+        return;
+      }
+
+      setStudyLoadingOverlay(true, "Preparing challenge...");
+      setIsChallengeGenerating(true);
+      try {
+        await prepareChallengeFromCards(cards);
+      } catch {
+        showToast("Could not prepare challenge. Try again.", "error");
+        setMode(null);
+        setChallengeQuestions([]);
+      }
+    } catch {
+      showToast("Could not prepare challenge. Try again.", "error");
+      setMode(null);
+      setChallengeQuestions([]);
+    } finally {
+      setStudyLoadingOverlay(false);
+      setIsChallengeGenerating(false);
+    }
+  }, [
+    noteId,
+    loadFlashcards,
+    note?.content,
+    handleGenerateFlashcards,
+    showToast,
+    setStudyLoadingOverlay,
+    prepareChallengeFromCards,
+    setIsSessionComplete,
+    setMode,
+    setChallengeQuestions,
+    setIsChallengeGenerating,
+  ]);
+
+  const modeRef = useRef(mode);
+  modeRef.current = mode;
+  const restartRef = useRef(restart);
+  restartRef.current = restart;
+  const runChallengeSessionRef = useRef(runChallengeSession);
+  runChallengeSessionRef.current = runChallengeSession;
+  const focusWeakToggleSkipFirst = useRef(true);
+
+  useEffect(() => {
+    if (focusWeakToggleSkipFirst.current) {
+      focusWeakToggleSkipFirst.current = false;
+      return;
+    }
+    const m = modeRef.current;
+    if (m !== "flashcards" && m !== "challenge") return;
+    if (m === "challenge") {
+      void runChallengeSessionRef.current();
+    } else {
+      void restartRef.current();
+    }
+  }, [focusWeakCards]);
 
   useEffect(() => {
     resetChallengeSession();
@@ -241,6 +345,18 @@ const {
     user?.uid,
   ]);
 
+  const handleChallenge = async () => {
+    await runChallengeSession();
+  };
+
+  const handleResetMode = () => {
+    setMode(null);
+    setChallengeQuestions([]);
+    setIsChallengeGenerating(false);
+    setChallengeSessionResults({});
+    resetMode();
+  };
+
 const isOutdated =
   flashcards.length > 0 &&
   note?.version !== undefined &&
@@ -256,32 +372,34 @@ const handleFlashcards = async () => {
   const cards = await loadFlashcards();
   if (cards?.length && focusWeakCards && user?.uid) {
     try {
-      const weakSorted = await getWeakCards(
-        user.uid,
-        "FlashcardMode|WeakCards|user_card_stats|sessionOrder",
+      const statsByIndex = await Promise.all(
+        cards.map(async (card) => {
+          const flashcardId = card.id?.trim();
+          if (!flashcardId) return null;
+          return getUserFlashcardStat(
+            user.uid,
+            flashcardId,
+            "FlashcardMode|WeakCards|user_flashcard_stats|sessionOrder",
+          );
+        }),
       );
-      const weakOrderedInDeck = buildWeakOrderedInDeck(cards, weakSorted);
-      console.log("Returned from weak selection");
-      const indices = weakOrderedInDeck
-        .map((card) => cards.findIndex((c) => c === card))
-        .filter((i) => i !== -1);
-      if (indices.length > 0) {
-        setSessionCards(indices);
-        console.log("Applied sessionCards:", indices);
-      }
-      const indicesDebug = orderFlashcardIndicesByWeakStats(cards, weakSorted);
-      console.log("Weak order indices:", indicesDebug);
-      console.log("Indices length:", indicesDebug?.length);
-      console.log("Total cards length:", cards.length);
-      if (indices.length === 0 && indicesDebug && indicesDebug.length > 0) {
-        console.log("Calling setSessionCards with:", indicesDebug);
-        setSessionCards(indicesDebug);
-        console.log("Applied weak session cards:", indicesDebug);
-      } else if (indices.length === 0) {
-        console.log("sessionCards is empty, using fallback");
+      const ordered = cards
+        .map((_, index) => {
+          const stat = statsByIndex[index];
+          const correct = stat?.correctCount ?? 0;
+          const incorrect = stat?.incorrectCount ?? 0;
+          const total = correct + incorrect;
+          if (total === 0) return { index, priority: 2 };
+          if (isWeakFromStats(stat ?? undefined)) return { index, priority: 1 };
+          return { index, priority: 0 };
+        })
+        .sort((a, b) => b.priority - a.priority)
+        .map((entry) => entry.index);
+      if (ordered.length > 0) {
+        setSessionCards(ordered);
+        console.log("Applied weak session cards:", ordered);
       } else {
-        console.log("Calling setSessionCards with:", indices);
-        console.log("Applied weak session cards:", indices);
+        console.log("sessionCards is empty, using fallback");
       }
     } catch (err) {
       console.error("[study] weak flashcard order failed", err);
@@ -290,177 +408,6 @@ const handleFlashcards = async () => {
     console.log("sessionCards is empty, using fallback");
   }
 };
-const handleResetMode = () => {
-  setMode(null);
-  setChallengeQuestions([]);
-  setIsChallengeGenerating(false);
-  setChallengeSessionResults({});
-  setReviewIncorrectCountsByFlashcardId({});
-  setSessionType("challenge");
-  setPreviousPerformance(null);
-  resetMode();
-};
-
-type PrepareChallengeFromCardsOptions = {
-  /** When true, force weak focus on; when false, force off; when omitted, use mode toggle. */
-  forceFocusWeakCards?: boolean;
-  sessionType?: SessionType;
-};
-
-const prepareChallengeFromCards = useCallback(
-  async (cards: Flashcard[], opts?: PrepareChallengeFromCardsOptions) => {
-    console.log("Session initialization started");
-    setChallengeQuestions([]);
-    setChallengeSessionResults({});
-    challengeSessionSavedRef.current = false;
-    setMode("challenge");
-    const nextSessionType = opts?.sessionType ?? "challenge";
-    setSessionType(nextSessionType);
-    if (nextSessionType === "challenge") {
-      setPreviousPerformance(null);
-      setReviewIncorrectCountsByFlashcardId({});
-    }
-
-    let focusForGeneration = focusWeakCards;
-    if (opts?.forceFocusWeakCards === true) {
-      focusForGeneration = true;
-    }
-    if (opts?.forceFocusWeakCards === false) {
-      focusForGeneration = false;
-    }
-
-    const mapped = await generateChallengeQuestions(cards, user?.uid, {
-      focusWeakCards: focusForGeneration,
-    });
-    const indices = mapped
-      .map((q) => cards.findIndex((c) => c.question === q.question))
-      .filter((i) => i !== -1);
-
-    console.log("Final mapped indices:", indices);
-
-    if (indices.length > 0) {
-      setSessionCards(indices);
-      console.log("Applied sessionCards:", indices);
-    } else {
-      console.warn("No valid indices found — sessionCards not set");
-    }
-
-    mapped.forEach((q) => {
-      const match = cards.find((c) => c.question === q.question);
-      console.log("Mapping question → card:", q.question, "→", match?.id);
-    });
-    if (mapped.length === 0) {
-      showToast(
-        "Flashcards are missing IDs. Regenerate flashcards from the editor and try again.",
-        "error",
-      );
-      setMode(null);
-      return false;
-    }
-    setChallengeQuestions(mapped);
-    return true;
-  },
-  [user?.uid, focusWeakCards, showToast],
-);
-
-const handleReviewCards = useCallback(async () => {
-  const reviewIdSet = new Set(
-    challengeReviewFlashcardIds.map((id) => id.trim()).filter(Boolean),
-  );
-  const reviewCards = flashcards.filter((c) => {
-    const id = c.id?.trim();
-    if (!id) return false;
-    return reviewIdSet.has(id);
-  });
-  if (reviewCards.length === 0) {
-    showToast("No missed cards to review.", "info");
-    return;
-  }
-  setPreviousPerformance({
-    previousCorrect: challengeQuiz.correctCount,
-    previousTotal: challengeQuestions.length,
-  });
-
-  setStudyLoadingOverlay(true, "Preparing challenge...");
-  setIsChallengeGenerating(true);
-  try {
-    await prepareChallengeFromCards(reviewCards, {
-      forceFocusWeakCards: true,
-      sessionType: "review",
-    });
-  } catch {
-    showToast("Could not prepare challenge. Try again.", "error");
-    setMode(null);
-    setChallengeQuestions([]);
-  } finally {
-    setStudyLoadingOverlay(false);
-    setIsChallengeGenerating(false);
-  }
-}, [
-  challengeReviewFlashcardIds,
-  challengeQuiz.correctCount,
-  challengeQuestions.length,
-  flashcards,
-  prepareChallengeFromCards,
-  showToast,
-  setStudyLoadingOverlay,
-]);
-
-const runChallengeSession = async (
-  prepareOpts?: Pick<PrepareChallengeFromCardsOptions, "forceFocusWeakCards">,
-) => {
-  if (!noteId) return;
-
-  setIsSessionComplete(false);
-  setStudyLoadingOverlay(true, "Generating flashcards...");
-
-  try {
-    let cards = await loadFlashcards({ skipLoadingOverlay: true });
-
-    if (!cards?.length) {
-      if (!note?.content?.trim()) {
-        showToast("Load your note first, then try Challenge mode again.", "error");
-        return;
-      }
-      await handleGenerateFlashcards({ skipSwitchToFlashcardMode: true });
-      setStudyLoadingOverlay(true, "Generating flashcards...");
-      cards = await loadFlashcards({ skipLoadingOverlay: true });
-    }
-
-    if (!cards?.length) {
-      showToast(
-        "No flashcards yet. Add more note content and generate flashcards first.",
-        "info",
-      );
-      return;
-    }
-
-    setStudyLoadingOverlay(true, "Preparing challenge...");
-    setIsChallengeGenerating(true);
-    try {
-      await prepareChallengeFromCards(cards, {
-        sessionType: "challenge",
-        ...prepareOpts,
-      });
-    } catch {
-      showToast("Could not prepare challenge. Try again.", "error");
-      setMode(null);
-      setChallengeQuestions([]);
-    }
-  } catch {
-    showToast("Could not prepare challenge. Try again.", "error");
-    setMode(null);
-    setChallengeQuestions([]);
-  } finally {
-    setStudyLoadingOverlay(false);
-    setIsChallengeGenerating(false);
-  }
-};
-
-const handleChallenge = async () => runChallengeSession();
-
-const handleContinueFullChallenge = async () =>
-  runChallengeSession({ forceFocusWeakCards: false });
 
 const handleSimulation = () => {
   if (!noteId?.trim()) return;
@@ -517,6 +464,8 @@ const handleSimulation = () => {
           (isChallengeGenerating || challengeQuestions.length > 0)
         }
         onResetMode={handleResetMode}
+        focusWeakCards={focusWeakCards}
+        onFocusWeakCardsChange={mode != null ? setFocusWeakCards : undefined}
       />
       {loading && <StudyLoadingOverlay loadingMessage={loadingMessage} />}
 {mode === null && (
@@ -547,13 +496,8 @@ const handleSimulation = () => {
           streak={challengeQuiz.streak}
           isComplete={challengeQuiz.isComplete}
           focusWeakCards={focusWeakCards}
-          sessionType={sessionType}
           answerResultsByFlashcardId={challengeSessionResults}
-          reviewIncorrectCountsByFlashcardId={reviewIncorrectCountsByFlashcardId}
-          previousPerformance={previousPerformance}
-          reviewFlashcardIds={challengeReviewFlashcardIds}
-          onReviewCards={handleReviewCards}
-          onContinueChallenge={handleContinueFullChallenge}
+          totalIncorrectFlashcards={challengeReviewFlashcardIds.length}
           onRevealAnswer={challengeQuiz.revealAnswer}
           onAnswer={handleChallengeAnswer}
           onRestartChallenge={handleChallenge}

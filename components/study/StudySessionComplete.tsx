@@ -65,7 +65,7 @@ export default function StudySessionComplete({
           cursor: "pointer",
         }}
       >
-        Restart
+        Restart session
       </button>
     </div>
   );

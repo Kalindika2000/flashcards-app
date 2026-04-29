@@ -6,10 +6,7 @@ export type ChallengeSummaryProps = {
   correctCount: number;
   totalQuestions: number;
   totalIncorrect?: number;
-  reviewFlashcardIds?: string[];
-  onReviewCards?: () => void | Promise<void>;
   onRestart: () => void;
-  onContinueChallenge?: () => void | Promise<void>;
   onExit: () => void;
 };
 
@@ -19,36 +16,19 @@ const cardBase =
 export default function ChallengeSummary({
   correctCount,
   totalQuestions,
-  totalIncorrect,
-  reviewFlashcardIds,
-  onReviewCards,
+  totalIncorrect = 0,
   onRestart,
-  onContinueChallenge,
   onExit,
 }: ChallengeSummaryProps) {
   const [entered, setEntered] = useState(false);
   const [isRestarting, setIsRestarting] = useState(false);
-  const [reviewCtaEntered, setReviewCtaEntered] = useState(false);
 
-  const reviewCountFromIds = reviewFlashcardIds?.length ?? 0;
-  const incorrectCount = totalIncorrect ?? reviewCountFromIds;
+  const incorrectCount = totalIncorrect;
 
   useEffect(() => {
     const id = requestAnimationFrame(() => setEntered(true));
     return () => cancelAnimationFrame(id);
   }, []);
-
-  useEffect(() => {
-    if (incorrectCount <= 0 || !onReviewCards) {
-      setReviewCtaEntered(false);
-      return;
-    }
-    setReviewCtaEntered(false);
-    const id = requestAnimationFrame(() => {
-      requestAnimationFrame(() => setReviewCtaEntered(true));
-    });
-    return () => cancelAnimationFrame(id);
-  }, [incorrectCount, onReviewCards]);
 
   const accuracy =
     totalQuestions > 0
@@ -62,7 +42,7 @@ export default function ChallengeSummary({
 
   const recommendation =
     incorrectCount > 0
-      ? `You got ${incorrectCount} cards wrong — reviewing them now is the fastest way to improve.`
+      ? `You got ${incorrectCount} cards wrong — restart the session to keep practicing with your current focus.`
       : "Perfect score. Great job!";
 
   const progressColor =
@@ -149,62 +129,20 @@ export default function ChallengeSummary({
         <p className="text-center text-sm text-gray-600 dark:text-gray-400">
           {recommendation}
         </p>
-        {incorrectCount > 0 ? (
-          <p className="text-center text-xs text-gray-500 dark:text-gray-400">
-            Focused on the cards you got wrong
-          </p>
-        ) : null}
       </div>
 
       <div className="mt-6 flex flex-col gap-3">
-        {incorrectCount > 0 && onReviewCards ? (
-          <div
-            className={[
-              "flex flex-col gap-1 transition-all duration-300",
-              reviewCtaEntered
-                ? "translate-y-0 opacity-100"
-                : "translate-y-2 opacity-0",
-            ].join(" ")}
-          >
-            <button
-              type="button"
-              onClick={() => void onReviewCards()}
-              className="w-full rounded-xl bg-green-500 py-3.5 text-center text-sm font-semibold text-white shadow-sm transition-all duration-150 hover:scale-[1.02] hover:bg-green-600 active:scale-[0.98]"
-            >
-              Review {incorrectCount} review cards
-            </button>
-            <p className="text-center text-xs text-gray-500 dark:text-gray-400">
-              Focus on the cards you just missed
-            </p>
-          </div>
-        ) : (
-          <div className="flex flex-col gap-3">
-            <button
-              type="button"
-              disabled={isRestarting}
-              onClick={() => {
-                console.log("[UI] Retry Weak Cards clicked");
-                handleRestart();
-              }}
-              className={[
-                "w-full rounded-xl bg-black py-3.5 text-center text-sm font-semibold text-white transition-all duration-150 hover:scale-[1.02] hover:opacity-90 active:scale-[0.98] dark:bg-white dark:text-black",
-                isRestarting ? "opacity-70" : "",
-              ].join(" ")}
-            >
-              🔁 Retry Weak Cards
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                console.log("[UI] Start Full Challenge clicked");
-                void onContinueChallenge?.();
-              }}
-              className="w-full rounded-xl border border-gray-200 bg-gray-50 py-3 text-center text-sm font-medium text-gray-900 transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
-            >
-              🎯 Start Full Challenge
-            </button>
-          </div>
-        )}
+        <button
+          type="button"
+          disabled={isRestarting}
+          onClick={handleRestart}
+          className={[
+            "w-full rounded-xl bg-black py-3.5 text-center text-sm font-semibold text-white transition-all duration-150 hover:scale-[1.02] hover:opacity-90 active:scale-[0.98] dark:bg-white dark:text-black",
+            isRestarting ? "opacity-70" : "",
+          ].join(" ")}
+        >
+          Restart session
+        </button>
         <div className="flex gap-3">
           <button
             type="button"
